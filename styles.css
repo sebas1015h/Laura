@@ -782,22 +782,138 @@ a {
   position: relative;
 }
 
-.letter-card__delete {
+/* Botones editar / eliminar en cartas dinámicas */
+.letter-card__actions {
   position: absolute;
   top: var(--space-sm);
   right: var(--space-sm);
+  display: flex;
+  gap: 0.3rem;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.letter-card--dynamic:hover .letter-card__actions {
+  opacity: 1;
+}
+
+.letter-card__edit,
+.letter-card__delete {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 1rem;
+  font-size: 0.9rem;
   line-height: 1;
+  padding: 0.25rem;
   transition: color var(--transition-fast);
-  padding: 0.2rem;
 }
 
-.letter-card__delete:hover {
-  color: var(--color-rose);
+.letter-card__edit:hover  { color: var(--color-lavender); }
+.letter-card__delete:hover { color: var(--color-rose); }
+
+
+/* ═══════════════════════════════════════════════════════════
+   GALERÍA — Formulario + Botones de admin
+═══════════════════════════════════════════════════════════ */
+.gallery__actions {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-md);
 }
+
+.gallery__form-wrapper {
+  max-width: 600px;
+  margin-inline: auto;
+  margin-bottom: var(--space-xl);
+  padding: var(--space-lg);
+  background: var(--bg-card);
+  border: var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.gallery__form-wrapper[hidden] { display: none; }
+
+.gallery__form-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+  text-align: center;
+}
+
+.form__file {
+  padding: 0.5rem;
+  cursor: pointer;
+}
+
+/* Barra de progreso de subida */
+.gallery__upload-progress {
+  margin-bottom: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.gallery__upload-progress[hidden] { display: none; }
+
+.gallery__upload-bar-wrapper {
+  width: 100%;
+  height: 6px;
+  background: rgba(176,125,214,0.2);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.gallery__upload-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--grad-btn);
+  border-radius: var(--radius-pill);
+  transition: width 0.15s ease;
+}
+
+#uploadText {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Botones editar / eliminar sobre cada foto */
+.gallery__item-actions {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  display: flex;
+  gap: 0.4rem;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 2;
+}
+
+.gallery__item:hover .gallery__item-actions {
+  opacity: 1;
+}
+
+.gallery__item-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(26, 10, 46, 0.85);
+  backdrop-filter: blur(6px);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.gallery__item-btn:hover { transform: scale(1.1); }
+
+.gallery__item-btn--edit:hover   { background: var(--color-violet); }
+.gallery__item-btn--delete:hover { background: var(--color-rose); }
 
 /* ═══════════════════════════════════════════════════════════
    FOOTER

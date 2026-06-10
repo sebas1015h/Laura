@@ -107,77 +107,53 @@
         <p class="section__desc">Filtra por fecha para encontrar tus momentos favoritos.</p>
       </header>
 
-      <!-- Filtros de fecha -->
-      <div class="gallery__filters" role="group" aria-label="Filtrar galería por fecha">
-        <button class="gallery__filter-btn gallery__filter-btn--active" data-filter="all">
-          Todos
-        </button>
-        <!-- ✏️  Agrega más botones de filtro siguiendo este patrón:
-             data-filter debe coincidir con data-date en las tarjetas -->
-        <button class="gallery__filter-btn" data-filter="2024-01">Enero 2024</button>
-        <button class="gallery__filter-btn" data-filter="2024-06">Junio 2024</button>
-        <button class="gallery__filter-btn" data-filter="2025-02">Feb 2025</button>
-        <button class="gallery__filter-btn" data-filter="2025-12">Dic 2025</button>
+      <!-- Botón agregar foto -->
+      <div class="gallery__actions">
+        <button class="btn btn--primary" id="addPhotoBtn">+ Agregar foto</button>
       </div>
 
-      <!-- Grid de fotos
-           ✏️  CÓMO AGREGAR UNA FOTO:
-           1. Copia el bloque <figure> completo.
-           2. Cambia src="fotos/tu-foto.jpg" por la ruta de tu imagen.
-           3. Cambia data-date="YYYY-MM" al año y mes de la foto.
-           4. Cambia el alt y el <figcaption> con tu descripción.
-      -->
-      <div class="gallery__grid" id="galleryGrid">
-
-        <figure class="gallery__item" data-date="2024-01">
-          <img src="fotos/foto1.jpg" alt="Descripción de la foto 1" class="gallery__img" loading="lazy" />
-          <figcaption class="gallery__caption">
-            <span class="gallery__caption-title">Primer encuentro</span>
-            <span class="gallery__caption-date">Enero 2024</span>
-          </figcaption>
-        </figure>
-
-        <figure class="gallery__item" data-date="2024-01">
-          <img src="fotos/foto2.jpg" alt="Descripción de la foto 2" class="gallery__img" loading="lazy" />
-          <figcaption class="gallery__caption">
-            <span class="gallery__caption-title">Primer paseo</span>
-            <span class="gallery__caption-date">Enero 2024</span>
-          </figcaption>
-        </figure>
-
-        <figure class="gallery__item" data-date="2024-06">
-          <img src="fotos/foto3.jpg" alt="Descripción de la foto 3" class="gallery__img" loading="lazy" />
-          <figcaption class="gallery__caption">
-            <span class="gallery__caption-title">Verano juntos</span>
-            <span class="gallery__caption-date">Junio 2024</span>
-          </figcaption>
-        </figure>
-
-        <figure class="gallery__item" data-date="2024-06">
-          <img src="fotos/foto4.jpg" alt="Descripción de la foto 4" class="gallery__img" loading="lazy" />
-          <figcaption class="gallery__caption">
-            <span class="gallery__caption-title">Ese día especial</span>
-            <span class="gallery__caption-date">Junio 2024</span>
-          </figcaption>
-        </figure>
-
-        <figure class="gallery__item" data-date="2025-02">
-          <img src="fotos/foto5.jpg" alt="Descripción de la foto 5" class="gallery__img" loading="lazy" />
-          <figcaption class="gallery__caption">
-            <span class="gallery__caption-title">San Valentín</span>
-            <span class="gallery__caption-date">Feb 2025</span>
-          </figcaption>
-        </figure>
-
-        <figure class="gallery__item" data-date="2025-12">
-          <img src="fotos/foto6.jpg" alt="Descripción de la foto 6" class="gallery__img" loading="lazy" />
-          <figcaption class="gallery__caption">
-            <span class="gallery__caption-title">Navidad</span>
-            <span class="gallery__caption-date">Dic 2025</span>
-          </figcaption>
-        </figure>
-
+      <!-- Formulario de foto (oculto por defecto) -->
+      <div class="gallery__form-wrapper" id="photoFormWrapper" hidden>
+        <h3 class="gallery__form-title" id="photoFormTitle">Agregar foto</h3>
+        <form class="gallery__form" id="photoForm" novalidate>
+          <div class="form__group">
+            <label class="form__label" for="photoTitle">Título / Descripción</label>
+            <input class="form__input" type="text" id="photoTitle" name="title"
+                   placeholder="Ej: Primer encuentro" maxlength="80" required />
+            <span class="form__error" role="alert"></span>
+          </div>
+          <div class="form__group">
+            <label class="form__label" for="photoDate">Mes y año</label>
+            <input class="form__input" type="month" id="photoDate" name="date" required />
+            <span class="form__error" role="alert"></span>
+          </div>
+          <div class="form__group">
+            <label class="form__label" for="photoFile">Subir foto desde tu dispositivo</label>
+            <input class="form__input form__file" type="file" id="photoFile" name="file" accept="image/*" />
+          </div>
+          <div class="form__group">
+            <label class="form__label" for="photoUrl">O pegar URL de la imagen</label>
+            <input class="form__input" type="url" id="photoUrl" name="url"
+                   placeholder="https://..." />
+          </div>
+          <div class="gallery__upload-progress" id="uploadProgress" hidden>
+            <div class="gallery__upload-bar-wrapper">
+              <div class="gallery__upload-bar" id="uploadBar"></div>
+            </div>
+            <span id="uploadText">Subiendo...</span>
+          </div>
+          <div class="form__actions">
+            <button type="button" class="btn btn--secondary" id="cancelPhoto">Cancelar</button>
+            <button type="submit" class="btn btn--primary" id="photoSubmitBtn">Guardar foto</button>
+          </div>
+        </form>
       </div>
+
+      <!-- Filtros — generados automáticamente por JS según los meses en Firestore -->
+      <div class="gallery__filters" id="galleryFilters" role="group" aria-label="Filtrar galería por fecha"></div>
+
+      <!-- Grid — poblado en tiempo real desde Firestore -->
+      <div class="gallery__grid" id="galleryGrid"></div>
 
       <!-- Lightbox -->
       <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Vista de imagen" hidden>
@@ -317,6 +293,10 @@
     <p class="footer__text">Hecho con <span class="footer__heart">♥</span> solo para ti.</p>
   </footer>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -1,70 +1,252 @@
-/**
- * app.js — Lógica principal de la página
- *
- * Módulos:
- *  1. Navbar — efecto scroll
- *  2. Gallery — filtros por fecha + lightbox
- *  3. Letters — repositorio de cartas (localStorage)
- *  4. Read-more — expandir texto en tarjetas
- */
-
 /* ─────────────────────────────────────────────────────────
-   1. NAVBAR — añade clase al hacer scroll
+   1. NAVBAR
 ───────────────────────────────────────────────────────── */
 (function initNavbar() {
   const navbar = document.getElementById('navbar');
   if (!navbar) return;
-
-  const onScroll = () => {
-    navbar.classList.toggle('scrolled', window.scrollY > 50);
-  };
-
+  const onScroll = () => navbar.classList.toggle('scrolled', window.scrollY > 50);
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 })();
 
 
 /* ─────────────────────────────────────────────────────────
-   2. GALLERY — filtros + lightbox
+   2. GALLERY — Firestore + Storage + tiempo real
 ───────────────────────────────────────────────────────── */
 (function initGallery() {
-  const grid       = document.getElementById('galleryGrid');
-  const filterBtns = document.querySelectorAll('.gallery__filter-btn');
-  const lightbox   = document.getElementById('lightbox');
-  const lbImg      = document.getElementById('lightboxImg');
-  const lbCaption  = document.getElementById('lightboxCaption');
-  const lbClose    = document.getElementById('lightboxClose');
+  const grid         = document.getElementById('galleryGrid');
+  const filtersDiv   = document.getElementById('galleryFilters');
+  const lightbox     = document.getElementById('lightbox');
+  const lbImg        = document.getElementById('lightboxImg');
+  const lbCaption    = document.getElementById('lightboxCaption');
+  const lbClose      = document.getElementById('lightboxClose');
+  const addBtn       = document.getElementById('addPhotoBtn');
+  const formWrap     = document.getElementById('photoFormWrapper');
+  const photoForm    = document.getElementById('photoForm');
+  const cancelBtn    = document.getElementById('cancelPhoto');
+  const fileInput    = document.getElementById('photoFile');
+  const urlInput     = document.getElementById('photoUrl');
+  const progressWrap = document.getElementById('uploadProgress');
+  const progressBar  = document.getElementById('uploadBar');
+  const progressText = document.getElementById('uploadText');
+  const submitBtn    = document.getElementById('photoSubmitBtn');
+  const formTitleEl  = document.getElementById('photoFormTitle');
 
   if (!grid) return;
 
-  /** Filtra los ítems según el valor del botón */
-  function applyFilter(filter) {
-    const items = grid.querySelectorAll('.gallery__item');
-    items.forEach(item => {
-      const match = filter === 'all' || item.dataset.date === filter;
-      item.classList.toggle('hidden', !match);
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  let currentFilter = 'all';
+  let allPhotos     = [];
+
+  function labelFromFilter(dateFilter) {
+    const [y, m] = dateFilter.split('-');
+    return `${MESES[parseInt(m, 10) - 1]} ${y}`;
+  }
+
+  /* ── Regenera botones de filtro según meses en Firestore ── */
+  function updateFilters() {
+    const months = [...new Set(allPhotos.map(p => p.dateFilter).filter(Boolean))].sort();
+    filtersDiv.innerHTML = '';
+
+    const allBtnEl = document.createElement('button');
+    allBtnEl.className = 'gallery__filter-btn' + (currentFilter === 'all' ? ' gallery__filter-btn--active' : '');
+    allBtnEl.dataset.filter = 'all';
+    allBtnEl.textContent = 'Todos';
+    allBtnEl.addEventListener('click', () => applyFilter('all', allBtnEl));
+    filtersDiv.appendChild(allBtnEl);
+
+    months.forEach(m => {
+      const btn = document.createElement('button');
+      btn.className = 'gallery__filter-btn' + (currentFilter === m ? ' gallery__filter-btn--active' : '');
+      btn.dataset.filter = m;
+      btn.textContent = labelFromFilter(m);
+      btn.addEventListener('click', () => applyFilter(m, btn));
+      filtersDiv.appendChild(btn);
     });
   }
 
-  /** Marca el botón activo */
-  function setActiveBtn(btn) {
-    filterBtns.forEach(b => b.classList.remove('gallery__filter-btn--active'));
-    btn.classList.add('gallery__filter-btn--active');
+  function applyFilter(filter, clickedBtn) {
+    currentFilter = filter;
+    filtersDiv.querySelectorAll('.gallery__filter-btn').forEach(b =>
+      b.classList.toggle('gallery__filter-btn--active', b === clickedBtn)
+    );
+    renderPhotos();
   }
 
-  filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      setActiveBtn(btn);
-      applyFilter(btn.dataset.filter);
+  /* ── Renderiza las fotos filtradas ── */
+  function renderPhotos() {
+    grid.innerHTML = '';
+    const list = currentFilter === 'all'
+      ? allPhotos
+      : allPhotos.filter(p => p.dateFilter === currentFilter);
+    list.forEach(createPhotoEl);
+  }
+
+  function createPhotoEl(photo) {
+    const fig = document.createElement('figure');
+    fig.className    = 'gallery__item';
+    fig.dataset.date = photo.dateFilter;
+    fig.dataset.id   = photo.id;
+
+    fig.innerHTML = `
+      <div class="gallery__item-actions">
+        <button class="gallery__item-btn gallery__item-btn--edit"   aria-label="Editar"   title="Editar">✏️</button>
+        <button class="gallery__item-btn gallery__item-btn--delete" aria-label="Eliminar" title="Eliminar">🗑️</button>
+      </div>
+      <img src="${escapeAttr(photo.src)}" alt="${escapeAttr(photo.captionTitle || '')}"
+           class="gallery__img" loading="lazy" />
+      <figcaption class="gallery__caption">
+        <span class="gallery__caption-title">${escapeHtml(photo.captionTitle || '')}</span>
+        <span class="gallery__caption-date">${escapeHtml(photo.captionDate  || '')}</span>
+      </figcaption>
+    `;
+
+    fig.querySelector('.gallery__img').addEventListener('click', e => {
+      e.stopPropagation();
+      openLightbox(photo.src, photo.captionTitle || '');
     });
+
+    fig.querySelector('.gallery__item-btn--edit').addEventListener('click', e => {
+      e.stopPropagation();
+      openEditForm(photo);
+    });
+
+    fig.querySelector('.gallery__item-btn--delete').addEventListener('click', e => {
+      e.stopPropagation();
+      if (!confirm('¿Eliminar esta foto?')) return;
+      db.collection('photos').doc(photo.id).delete();
+    });
+
+    grid.appendChild(fig);
+  }
+
+  /* ── Firestore: escucha cambios en tiempo real ── */
+  db.collection('photos')
+    .orderBy('createdAt', 'asc')
+    .onSnapshot(snapshot => {
+      allPhotos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateFilters();
+      renderPhotos();
+    });
+
+  /* ── Abrir / cerrar formulario ── */
+  addBtn.addEventListener('click', () => {
+    photoForm.reset();
+    photoForm.dataset.editId  = '';
+    photoForm.dataset.editSrc = '';
+    formTitleEl.textContent   = 'Agregar foto';
+    urlInput.value            = '';
+    progressWrap.hidden       = true;
+    formWrap.hidden           = false;
+    addBtn.hidden             = true;
+    formWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  cancelBtn.addEventListener('click', closeForm);
+
+  function closeForm() {
+    formWrap.hidden = true;
+    addBtn.hidden   = false;
+    photoForm.reset();
+    photoForm.dataset.editId  = '';
+    photoForm.dataset.editSrc = '';
+    progressWrap.hidden = true;
+  }
+
+  function openEditForm(photo) {
+    photoForm.dataset.editId  = photo.id;
+    photoForm.dataset.editSrc = photo.src;
+    formTitleEl.textContent   = 'Editar foto';
+    document.getElementById('photoTitle').value = photo.captionTitle || '';
+    document.getElementById('photoDate').value  = photo.dateFilter   || '';
+    urlInput.value      = photo.src || '';
+    progressWrap.hidden = true;
+    formWrap.hidden     = false;
+    addBtn.hidden       = true;
+    formWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  /* ── Submit: subir a Storage o guardar URL ── */
+  photoForm.addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const title   = document.getElementById('photoTitle').value.trim();
+    const dateVal = document.getElementById('photoDate').value;
+    const editId  = photoForm.dataset.editId;
+    const editSrc = photoForm.dataset.editSrc;
+
+    if (!title)   { alert('Agrega un título para la foto.'); return; }
+    if (!dateVal) { alert('Selecciona el mes y año.');       return; }
+
+    const [year, month] = dateVal.split('-');
+    const captionDate   = `${MESES[parseInt(month, 10) - 1]} ${year}`;
+
+    submitBtn.disabled    = true;
+    submitBtn.textContent = 'Guardando...';
+
+    try {
+      let src = urlInput.value.trim() || editSrc;
+
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const ref  = storage.ref(`photos/${Date.now()}_${file.name}`);
+
+        progressWrap.hidden       = false;
+        progressBar.style.width   = '0%';
+        progressText.textContent  = 'Subiendo...';
+
+        await new Promise((resolve, reject) => {
+          const task = ref.put(file);
+          task.on('state_changed',
+            snap => {
+              const pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
+              progressBar.style.width  = pct + '%';
+              progressText.textContent = `Subiendo... ${pct}%`;
+            },
+            reject,
+            resolve
+          );
+        });
+
+        src = await ref.getDownloadURL();
+        progressText.textContent = '¡Listo!';
+      }
+
+      if (!src) { alert('Sube una foto o pega una URL de imagen.'); return; }
+
+      const data = {
+        src,
+        alt:          title,
+        captionTitle: title,
+        captionDate,
+        dateFilter:   dateVal,
+      };
+
+      if (editId) {
+        await db.collection('photos').doc(editId).update(data);
+      } else {
+        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        await db.collection('photos').add(data);
+      }
+
+      closeForm();
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar la foto. Revisa la consola.');
+    } finally {
+      submitBtn.disabled    = false;
+      submitBtn.textContent = 'Guardar foto';
+    }
   });
 
   /* ── Lightbox ── */
-  function openLightbox(imgSrc, captionText) {
-    lbImg.src     = imgSrc;
-    lbImg.alt     = captionText;
-    lbCaption.textContent = captionText;
-    lightbox.hidden = false;
+  function openLightbox(src, caption) {
+    lbImg.src             = src;
+    lbImg.alt             = caption;
+    lbCaption.textContent = caption;
+    lightbox.hidden       = false;
     document.body.style.overflow = 'hidden';
     lbClose.focus();
   }
@@ -74,20 +256,8 @@
     document.body.style.overflow = '';
   }
 
-  grid.addEventListener('click', e => {
-    const item = e.target.closest('.gallery__item');
-    if (!item) return;
-    const img     = item.querySelector('.gallery__img');
-    const caption = item.querySelector('.gallery__caption-title')?.textContent ?? '';
-    openLightbox(img.src, caption);
-  });
-
   lbClose.addEventListener('click', closeLightbox);
-
-  lightbox.addEventListener('click', e => {
-    if (e.target === lightbox) closeLightbox();
-  });
-
+  lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !lightbox.hidden) closeLightbox();
   });
@@ -95,43 +265,27 @@
 
 
 /* ─────────────────────────────────────────────────────────
-   3. LETTERS — formulario + localStorage
+   3. LETTERS — Firestore + tiempo real
 ───────────────────────────────────────────────────────── */
 (function initLetters() {
-  const STORAGE_KEY = 'love_letters_v1';
-
-  const openBtn       = document.getElementById('openLetterForm');
-  const cancelBtn     = document.getElementById('cancelLetter');
-  const formWrapper   = document.getElementById('letterFormWrapper');
-  const form          = document.getElementById('letterForm');
-  const grid          = document.getElementById('lettersGrid');
-  const textarea      = document.getElementById('letterContent');
-  const charCount     = document.getElementById('charCount');
+  const openBtn     = document.getElementById('openLetterForm');
+  const cancelBtn   = document.getElementById('cancelLetter');
+  const formWrapper = document.getElementById('letterFormWrapper');
+  const form        = document.getElementById('letterForm');
+  const grid        = document.getElementById('lettersGrid');
+  const textarea    = document.getElementById('letterContent');
+  const charCount   = document.getElementById('charCount');
 
   if (!openBtn || !form || !grid) return;
 
-  /* ── Persistencia ── */
-  function loadLetters() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveLetters(letters) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(letters));
-  }
-
-  /* ── Contador de caracteres ── */
   textarea.addEventListener('input', () => {
     charCount.textContent = textarea.value.length;
   });
 
-  /* ── Mostrar / ocultar formulario ── */
   openBtn.addEventListener('click', () => {
-    formWrapper.hidden = false;
-    openBtn.hidden     = true;
+    form.dataset.editId = '';
+    formWrapper.hidden  = false;
+    openBtn.hidden      = true;
     form.elements['title'].focus();
   });
 
@@ -139,13 +293,13 @@
 
   function resetForm() {
     form.reset();
+    form.dataset.editId   = '';
     charCount.textContent = '0';
     clearErrors();
     formWrapper.hidden = true;
     openBtn.hidden     = false;
   }
 
-  /* ── Validación ── */
   function clearErrors() {
     form.querySelectorAll('.form__error').forEach(el => (el.textContent = ''));
     form.querySelectorAll('.form__input').forEach(el => el.removeAttribute('aria-invalid'));
@@ -161,54 +315,72 @@
   function validateForm(data) {
     let valid = true;
     clearErrors();
-    if (!data.title.trim()) {
-      showError('letterTitle', 'El título es obligatorio.');
-      valid = false;
-    }
-    if (!data.type) {
-      showError('letterType', 'Elige un tipo de mensaje.');
-      valid = false;
-    }
-    if (!data.content.trim()) {
-      showError('letterContent', 'El contenido no puede estar vacío.');
-      valid = false;
-    }
+    if (!data.title.trim())   { showError('letterTitle',   'El título es obligatorio.'); valid = false; }
+    if (!data.type)            { showError('letterType',    'Elige un tipo de mensaje.'); valid = false; }
+    if (!data.content.trim()) { showError('letterContent', 'El contenido no puede estar vacío.'); valid = false; }
     return valid;
   }
 
-  /* ── Guardar nueva carta ── */
-  form.addEventListener('submit', e => {
+  form.addEventListener('submit', async e => {
     e.preventDefault();
     const data = {
-      id:      crypto.randomUUID(),
       title:   form.elements['title'].value,
       type:    form.elements['type'].value,
       content: form.elements['content'].value,
-      date:    new Date().toISOString(),
     };
 
     if (!validateForm(data)) return;
 
-    const letters = loadLetters();
-    letters.unshift(data);
-    saveLetters(letters);
-    renderDynamicCard(data, true);
-    resetForm();
+    const editId    = form.dataset.editId;
+    const submitBtn = form.querySelector('[type="submit"]');
+    submitBtn.disabled = true;
+
+    try {
+      if (editId) {
+        await db.collection('letters').doc(editId).update(data);
+      } else {
+        data.date = firebase.firestore.FieldValue.serverTimestamp();
+        await db.collection('letters').add(data);
+      }
+      resetForm();
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar el mensaje.');
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 
-  /* ── Renderizar tarjeta dinámica ── */
-  function renderDynamicCard(letter, prepend = false) {
-    const card = document.createElement('article');
+  /* ── Firestore: escucha cambios en tiempo real ── */
+  db.collection('letters')
+    .orderBy('date', 'desc')
+    .onSnapshot(snapshot => {
+      grid.querySelectorAll('.letter-card--dynamic').forEach(c => c.remove());
+      snapshot.docs.forEach(doc => renderCard({ id: doc.id, ...doc.data() }));
+    });
+
+  const tagClassMap = {
+    carta:   '',
+    mensaje: 'letter-card__tag--mensaje',
+    poema:   'letter-card__tag--poema',
+    promesa: 'letter-card__tag--promesa',
+  };
+
+  function renderCard(letter) {
+    const card      = document.createElement('article');
     card.className  = 'letter-card letter-card--dynamic';
     card.dataset.id = letter.id;
 
     const tagClass  = tagClassMap[letter.type] || '';
-    const dateLabel = new Date(letter.date).toLocaleDateString('es-ES', {
-      day: 'numeric', month: 'long', year: 'numeric'
-    });
+    const dateLabel = letter.date?.toDate
+      ? letter.date.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+      : '';
 
     card.innerHTML = `
-      <button class="letter-card__delete" aria-label="Eliminar mensaje" title="Eliminar">✕</button>
+      <div class="letter-card__actions">
+        <button class="letter-card__edit"   aria-label="Editar"   title="Editar">✏️</button>
+        <button class="letter-card__delete" aria-label="Eliminar" title="Eliminar">✕</button>
+      </div>
       <header class="letter-card__header">
         <span class="letter-card__tag ${tagClass}">${capitalize(letter.type)}</span>
         <time class="letter-card__date">${dateLabel}</time>
@@ -221,50 +393,40 @@
       </div>
     `;
 
-    /* Eliminar */
     card.querySelector('.letter-card__delete').addEventListener('click', () => {
       if (!confirm('¿Eliminar este mensaje?')) return;
-      const letters = loadLetters().filter(l => l.id !== letter.id);
-      saveLetters(letters);
-      card.remove();
+      db.collection('letters').doc(letter.id).delete();
     });
 
-    /* Read-more inline */
+    card.querySelector('.letter-card__edit').addEventListener('click', () => {
+      form.elements['title'].value   = letter.title;
+      form.elements['type'].value    = letter.type;
+      form.elements['content'].value = letter.content;
+      charCount.textContent          = letter.content.length;
+      form.dataset.editId            = letter.id;
+      formWrapper.hidden = false;
+      openBtn.hidden     = true;
+      form.elements['title'].focus();
+      formWrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
     wireReadMore(card);
-
-    if (prepend) {
-      grid.insertBefore(card, grid.firstChild);
-    } else {
-      grid.appendChild(card);
-    }
+    grid.appendChild(card);
   }
-
-  /* ── Cargar cartas guardadas al iniciar ── */
-  loadLetters().forEach(letter => renderDynamicCard(letter, false));
-
-  /* ── Mapa de clases por tipo ── */
-  const tagClassMap = {
-    carta:   '',
-    mensaje: 'letter-card__tag--mensaje',
-    poema:   'letter-card__tag--poema',
-    promesa: 'letter-card__tag--promesa',
-  };
 })();
 
 
 /* ─────────────────────────────────────────────────────────
-   4. READ-MORE — expandir/colapsar texto en tarjetas fijas
+   4. READ-MORE — cartas fijas del HTML
 ───────────────────────────────────────────────────────── */
 (function initReadMore() {
   document.querySelectorAll('.letter-card:not(.letter-card--dynamic)').forEach(wireReadMore);
 })();
 
-/** Conecta el botón "Leer completo" de una tarjeta */
 function wireReadMore(card) {
   const btn  = card.querySelector('.letter-card__read-btn');
   const full = card.querySelector('.letter-card__full');
   if (!btn || !full) return;
-
   btn.addEventListener('click', () => {
     const expanded = btn.getAttribute('aria-expanded') === 'true';
     full.hidden    = expanded;
@@ -277,7 +439,7 @@ function wireReadMore(card) {
    HELPERS
 ───────────────────────────────────────────────────────── */
 function escapeHtml(str) {
-  return str
+  return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -285,6 +447,10 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function escapeAttr(str) {
+  return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
 function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
+  return String(str).charAt(0).toUpperCase() + String(str).slice(1);
 }
