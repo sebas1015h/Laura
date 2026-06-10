@@ -1,155 +1,154 @@
-import { db, storage } from './firebase-config.js';
-import {
-  collection, addDoc, updateDoc, deleteDoc, doc,
-  query, orderBy, onSnapshot, serverTimestamp
-} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
-import {
-  ref as sRef, uploadBytesResumable, getDownloadURL
-} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js';
-
 /* ─────────────────────────────────────────────────────────
    1. NAVBAR
 ───────────────────────────────────────────────────────── */
 (function initNavbar() {
-  const navbar = document.getElementById('navbar');
+  var navbar = document.getElementById('navbar');
   if (!navbar) return;
-  const onScroll = () => navbar.classList.toggle('scrolled', window.scrollY > 50);
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
+  window.addEventListener('scroll', function () {
+    navbar.classList.toggle('scrolled', window.scrollY > 50);
+  }, { passive: true });
 })();
 
 
 /* ─────────────────────────────────────────────────────────
-   2. GALLERY — Firebase Storage + Firestore + tiempo real
+   2. GALLERY
 ───────────────────────────────────────────────────────── */
 (function initGallery() {
-  const grid         = document.getElementById('galleryGrid');
-  const filtersDiv   = document.getElementById('galleryFilters');
-  const lightbox     = document.getElementById('lightbox');
-  const lbImg        = document.getElementById('lightboxImg');
-  const lbCaption    = document.getElementById('lightboxCaption');
-  const lbClose      = document.getElementById('lightboxClose');
-  const addBtn       = document.getElementById('addPhotoBtn');
-  const formWrap     = document.getElementById('photoFormWrapper');
-  const photoForm    = document.getElementById('photoForm');
-  const cancelBtn    = document.getElementById('cancelPhoto');
-  const fileInput    = document.getElementById('photoFile');
-  const urlInput     = document.getElementById('photoUrl');
-  const progressWrap = document.getElementById('uploadProgress');
-  const progressBar  = document.getElementById('uploadBar');
-  const progressText = document.getElementById('uploadText');
-  const submitBtn    = document.getElementById('photoSubmitBtn');
-  const formTitleEl  = document.getElementById('photoFormTitle');
-  const errorBox     = document.getElementById('photoError');
 
-  if (!grid) return;
+  /* ── Referencias DOM ── */
+  var grid         = document.getElementById('galleryGrid');
+  var filtersDiv   = document.getElementById('galleryFilters');
+  var addBtn       = document.getElementById('addPhotoBtn');
+  var formWrap     = document.getElementById('photoFormWrapper');
+  var cancelBtn    = document.getElementById('cancelPhoto');
+  var photoForm    = document.getElementById('photoForm');
+  var fileInput    = document.getElementById('photoFile');
+  var urlInput     = document.getElementById('photoUrl');
+  var submitBtn    = document.getElementById('photoSubmitBtn');
+  var formTitleEl  = document.getElementById('photoFormTitle');
+  var progressWrap = document.getElementById('uploadProgress');
+  var progressBar  = document.getElementById('uploadBar');
+  var progressText = document.getElementById('uploadText');
+  var errorBox     = document.getElementById('photoError');
+  var lightbox     = document.getElementById('lightbox');
+  var lbImg        = document.getElementById('lightboxImg');
+  var lbCaption    = document.getElementById('lightboxCaption');
+  var lbClose      = document.getElementById('lightboxClose');
 
-  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  let currentFilter = 'all';
-  let allPhotos     = [];
+  if (!grid || !addBtn) return;
 
-  /* ── Errores ── */
-  function showPhotoError(msg) { errorBox.textContent = msg; errorBox.hidden = false; }
-  function clearPhotoError()   { errorBox.hidden = true; errorBox.textContent = ''; }
+  var MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+               'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var currentFilter = 'all';
+  var allPhotos = [];
 
-  function storageErrorMsg(err) {
-    const code = err?.code || '';
-    if (code.includes('unauthorized') || code.includes('permission-denied'))
-      return '⚠️ Sin permiso. Ve a Firebase Console → Storage → Reglas y cambia la fecha de expiración a 2027.';
-    if (code.includes('quota-exceeded'))
-      return '⚠️ Se agotó el espacio de almacenamiento.';
-    if (code.includes('network') || err?.message?.includes('network'))
-      return '⚠️ Error de red. Verifica tu conexión e intenta de nuevo.';
-    return `⚠️ Error: ${err?.message || code || 'desconocido'}`;
+  /* ── Error helpers ── */
+  function showError(msg) {
+    errorBox.textContent = '⚠️ ' + msg;
+    errorBox.hidden = false;
+  }
+  function clearError() {
+    errorBox.hidden = true;
+    errorBox.textContent = '';
   }
 
   /* ── Filtros ── */
-  function labelFromFilter(df) {
-    const [y, m] = df.split('-');
-    return `${MESES[parseInt(m, 10) - 1]} ${y}`;
-  }
+  function rebuildFilters() {
+    var months = allPhotos
+      .map(function (p) { return p.dateFilter; })
+      .filter(Boolean)
+      .filter(function (v, i, a) { return a.indexOf(v) === i; })
+      .sort();
 
-  function updateFilters() {
-    const months = [...new Set(allPhotos.map(p => p.dateFilter).filter(Boolean))].sort();
     filtersDiv.innerHTML = '';
-    const allEl = makeFilterBtn('all', 'Todos');
-    filtersDiv.appendChild(allEl);
-    months.forEach(m => filtersDiv.appendChild(makeFilterBtn(m, labelFromFilter(m))));
-  }
 
-  function makeFilterBtn(filter, label) {
-    const btn = document.createElement('button');
-    btn.className = 'gallery__filter-btn' + (currentFilter === filter ? ' gallery__filter-btn--active' : '');
-    btn.dataset.filter = filter;
-    btn.textContent = label;
-    btn.addEventListener('click', () => {
-      currentFilter = filter;
-      filtersDiv.querySelectorAll('.gallery__filter-btn')
-        .forEach(b => b.classList.toggle('gallery__filter-btn--active', b === btn));
-      renderPhotos();
+    addFilterBtn('all', 'Todos');
+    months.forEach(function (m) {
+      var parts = m.split('-');
+      addFilterBtn(m, MESES[parseInt(parts[1], 10) - 1] + ' ' + parts[0]);
     });
-    return btn;
   }
 
-  /* ── Renderizado ── */
-  function renderPhotos() {
+  function addFilterBtn(filter, label) {
+    var btn = document.createElement('button');
+    btn.className = 'gallery__filter-btn' + (currentFilter === filter ? ' gallery__filter-btn--active' : '');
+    btn.textContent = filter === currentFilter ? label : label;
+    btn.dataset.filter = filter;
+    btn.addEventListener('click', function () {
+      currentFilter = filter;
+      filtersDiv.querySelectorAll('.gallery__filter-btn').forEach(function (b) {
+        b.classList.toggle('gallery__filter-btn--active', b === btn);
+      });
+      renderGrid();
+    });
+    filtersDiv.appendChild(btn);
+  }
+
+  /* ── Render grid ── */
+  function renderGrid() {
     grid.innerHTML = '';
-    const list = currentFilter === 'all'
-      ? allPhotos : allPhotos.filter(p => p.dateFilter === currentFilter);
-    list.forEach(createPhotoEl);
+    var list = currentFilter === 'all'
+      ? allPhotos
+      : allPhotos.filter(function (p) { return p.dateFilter === currentFilter; });
+    list.forEach(addPhotoCard);
   }
 
-  function createPhotoEl(photo) {
-    const fig = document.createElement('figure');
+  function addPhotoCard(photo) {
+    var fig = document.createElement('figure');
     fig.className = 'gallery__item';
     fig.dataset.date = photo.dateFilter;
-    fig.dataset.id   = photo.id;
-    fig.innerHTML = `
-      <div class="gallery__item-actions">
-        <button class="gallery__item-btn gallery__item-btn--edit"   title="Editar">✏️</button>
-        <button class="gallery__item-btn gallery__item-btn--delete" title="Eliminar">🗑️</button>
-      </div>
-      <img src="${escapeAttr(photo.src)}" alt="${escapeAttr(photo.captionTitle || '')}"
-           class="gallery__img" loading="lazy" />
-      <figcaption class="gallery__caption">
-        <span class="gallery__caption-title">${escapeHtml(photo.captionTitle || '')}</span>
-        <span class="gallery__caption-date">${escapeHtml(photo.captionDate  || '')}</span>
-      </figcaption>`;
+    fig.dataset.id = photo.id;
+    fig.innerHTML =
+      '<div class="gallery__item-actions">' +
+        '<button class="gallery__item-btn gallery__item-btn--edit" title="Editar">✏️</button>' +
+        '<button class="gallery__item-btn gallery__item-btn--delete" title="Eliminar">🗑️</button>' +
+      '</div>' +
+      '<img src="' + escapeAttr(photo.src) + '" alt="' + escapeAttr(photo.captionTitle || '') + '" class="gallery__img" loading="lazy" />' +
+      '<figcaption class="gallery__caption">' +
+        '<span class="gallery__caption-title">' + escapeHtml(photo.captionTitle || '') + '</span>' +
+        '<span class="gallery__caption-date">' + escapeHtml(photo.captionDate || '') + '</span>' +
+      '</figcaption>';
 
-    fig.querySelector('.gallery__img').addEventListener('click', e => {
+    fig.querySelector('.gallery__img').addEventListener('click', function (e) {
       e.stopPropagation();
       openLightbox(photo.src, photo.captionTitle || '');
     });
-    fig.querySelector('.gallery__item-btn--edit').addEventListener('click', e => {
-      e.stopPropagation(); openEditForm(photo);
+    fig.querySelector('.gallery__item-btn--edit').addEventListener('click', function (e) {
+      e.stopPropagation();
+      openEditForm(photo);
     });
-    fig.querySelector('.gallery__item-btn--delete').addEventListener('click', e => {
+    fig.querySelector('.gallery__item-btn--delete').addEventListener('click', function (e) {
       e.stopPropagation();
       if (!confirm('¿Eliminar esta foto?')) return;
-      deleteDoc(doc(db, 'photos', photo.id));
+      db.collection('photos').doc(photo.id).delete();
     });
+
     grid.appendChild(fig);
   }
 
-  /* ── Tiempo real ── */
-  onSnapshot(query(collection(db, 'photos'), orderBy('createdAt', 'asc')), snap => {
-    allPhotos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    updateFilters();
-    renderPhotos();
+  /* ── Firestore tiempo real ── */
+  db.collection('photos').orderBy('createdAt', 'asc').onSnapshot(function (snap) {
+    allPhotos = snap.docs.map(function (d) {
+      return Object.assign({ id: d.id }, d.data());
+    });
+    rebuildFilters();
+    renderGrid();
+  }, function (err) {
+    console.error('Firestore error:', err);
   });
 
-  /* ── Formulario ── */
-  addBtn.addEventListener('click', () => {
+  /* ── Abrir / cerrar formulario ── */
+  addBtn.addEventListener('click', function () {
     photoForm.reset();
-    photoForm.dataset.editId = photoForm.dataset.editSrc = '';
+    photoForm.dataset.editId = '';
+    photoForm.dataset.editSrc = '';
     formTitleEl.textContent = 'Agregar foto';
     urlInput.value = '';
     progressWrap.hidden = true;
-    clearPhotoError();
-    formWrap.hidden = false;
+    clearError();
     addBtn.hidden = true;
-    formWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    formWrap.hidden = false;
+    formWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 
   cancelBtn.addEventListener('click', closeForm);
@@ -158,107 +157,147 @@ import {
     formWrap.hidden = true;
     addBtn.hidden = false;
     photoForm.reset();
-    photoForm.dataset.editId = photoForm.dataset.editSrc = '';
+    photoForm.dataset.editId = '';
+    photoForm.dataset.editSrc = '';
     progressWrap.hidden = true;
-    clearPhotoError();
+    clearError();
   }
 
   function openEditForm(photo) {
-    photoForm.dataset.editId  = photo.id;
+    photoForm.dataset.editId = photo.id;
     photoForm.dataset.editSrc = photo.src;
-    formTitleEl.textContent   = 'Editar foto';
+    formTitleEl.textContent = 'Editar foto';
     document.getElementById('photoTitle').value = photo.captionTitle || '';
-    document.getElementById('photoDate').value  = photo.dateFilter   || '';
+    document.getElementById('photoDate').value = photo.dateFilter || '';
     urlInput.value = photo.src || '';
     progressWrap.hidden = true;
-    clearPhotoError();
-    formWrap.hidden = false;
+    clearError();
     addBtn.hidden = true;
-    formWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    formWrap.hidden = false;
+    formWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  /* ── Submit: comprimir → subir → guardar ── */
-  photoForm.addEventListener('submit', async e => {
+  /* ── Submit ── */
+  photoForm.addEventListener('submit', function (e) {
     e.preventDefault();
-    clearPhotoError();
+    clearError();
 
-    const title   = document.getElementById('photoTitle').value.trim();
-    const dateVal = document.getElementById('photoDate').value;
-    const editId  = photoForm.dataset.editId;
-    const editSrc = photoForm.dataset.editSrc;
+    var title   = document.getElementById('photoTitle').value.trim();
+    var dateVal = document.getElementById('photoDate').value;
+    var editId  = photoForm.dataset.editId;
+    var editSrc = photoForm.dataset.editSrc;
 
-    if (!title)   { showPhotoError('⚠️ Agrega un título para la foto.'); return; }
-    if (!dateVal) { showPhotoError('⚠️ Selecciona el mes y año.');       return; }
+    if (!title)   { showError('Agrega un título para la foto.'); return; }
+    if (!dateVal) { showError('Selecciona el mes y año.');       return; }
 
-    const [year, month] = dateVal.split('-');
-    const captionDate   = `${MESES[parseInt(month, 10) - 1]} ${year}`;
+    var parts = dateVal.split('-');
+    var captionDate = MESES[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
 
-    submitBtn.disabled    = true;
+    submitBtn.disabled = true;
     submitBtn.textContent = 'Guardando...';
 
-    try {
-      let src = urlInput.value.trim() || editSrc;
+    var urlValue = urlInput.value.trim();
+    var file = fileInput.files.length > 0 ? fileInput.files[0] : null;
 
-      if (fileInput.files.length > 0) {
-        const file = fileInput.files[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        showError('El archivo no es una imagen. Usa JPG, PNG o WEBP.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Guardar foto';
+        return;
+      }
 
-        if (!file.type.startsWith('image/')) {
-          showPhotoError('⚠️ El archivo no es una imagen. Usa JPG, PNG o WEBP.');
-          return;
-        }
+      progressWrap.hidden = false;
+      progressBar.style.width = '0%';
+      progressText.textContent = 'Comprimiendo...';
 
-        progressWrap.hidden     = false;
-        progressBar.style.width = '0%';
-        progressText.textContent = 'Comprimiendo...';
+      compressImage(file)
+        .then(function (compressed) {
+          progressText.textContent = 'Subiendo...';
+          var storageRef = storage.ref('photos/' + Date.now() + '.jpg');
+          var task = storageRef.put(compressed, { contentType: 'image/jpeg' });
 
-        const compressed = await compressImage(file);
-
-        progressText.textContent = 'Subiendo...';
-
-        const fileRef = sRef(storage, `photos/${Date.now()}.jpg`);
-        const task    = uploadBytesResumable(fileRef, compressed, { contentType: 'image/jpeg' });
-
-        await new Promise((resolve, reject) => {
           task.on('state_changed',
-            snap => {
-              const pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
-              progressBar.style.width  = pct + '%';
-              progressText.textContent = `Subiendo... ${pct}%`;
+            function (snap) {
+              var pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
+              progressBar.style.width = pct + '%';
+              progressText.textContent = 'Subiendo... ' + pct + '%';
             },
-            reject,
-            resolve
+            function (err) {
+              console.error('Storage error:', err);
+              progressWrap.hidden = true;
+              showError(storageErrMsg(err));
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Guardar foto';
+            },
+            function () {
+              storageRef.getDownloadURL().then(function (src) {
+                progressText.textContent = '¡Listo!';
+                guardarFoto(src, title, captionDate, dateVal, editId, editSrc);
+              }).catch(function (err) {
+                showError('No se pudo obtener la URL de la imagen: ' + err.message);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Guardar foto';
+              });
+            }
           );
+        })
+        .catch(function (err) {
+          showError(err.message || 'Error al comprimir la imagen.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Guardar foto';
         });
 
-        src = await getDownloadURL(fileRef);
-        progressText.textContent = '¡Listo!';
-      }
+    } else if (urlValue) {
+      guardarFoto(urlValue, title, captionDate, dateVal, editId, editSrc);
 
-      if (!src) { showPhotoError('⚠️ Sube una foto o pega una URL de imagen.'); return; }
-
-      const data = { src, alt: title, captionTitle: title, captionDate, dateFilter: dateVal };
-
-      if (editId) {
-        await updateDoc(doc(db, 'photos', editId), data);
-      } else {
-        data.createdAt = serverTimestamp();
-        await addDoc(collection(db, 'photos'), data);
-      }
-
-      closeForm();
-    } catch (err) {
-      console.error('Error foto:', err);
-      progressWrap.hidden = true;
-      showPhotoError(storageErrorMsg(err));
-    } finally {
-      submitBtn.disabled    = false;
+    } else {
+      showError('Sube una foto o pega una URL de imagen.');
+      submitBtn.disabled = false;
       submitBtn.textContent = 'Guardar foto';
     }
   });
 
+  function guardarFoto(src, title, captionDate, dateVal, editId, editSrc) {
+    var data = {
+      src: src,
+      alt: title,
+      captionTitle: title,
+      captionDate: captionDate,
+      dateFilter: dateVal
+    };
+
+    var promise = editId
+      ? db.collection('photos').doc(editId).update(data)
+      : db.collection('photos').add(Object.assign({ createdAt: firebase.firestore.FieldValue.serverTimestamp() }, data));
+
+    promise
+      .then(function () { closeForm(); })
+      .catch(function (err) {
+        console.error('Firestore error:', err);
+        showError('Error al guardar en base de datos: ' + err.message);
+      })
+      .finally(function () {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Guardar foto';
+      });
+  }
+
+  function storageErrMsg(err) {
+    var code = err.code || '';
+    if (code.indexOf('unauthorized') !== -1 || code.indexOf('permission-denied') !== -1)
+      return 'Sin permiso para subir. Ve a Firebase Console → Storage → Reglas y actualiza la fecha de expiración.';
+    if (code.indexOf('quota') !== -1)
+      return 'Se agotó el almacenamiento de Firebase.';
+    if (code.indexOf('network') !== -1)
+      return 'Error de red. Verifica tu conexión e intenta de nuevo.';
+    return 'Error de Storage: ' + (err.message || code);
+  }
+
   /* ── Lightbox ── */
   function openLightbox(src, caption) {
-    lbImg.src = src; lbImg.alt = caption;
+    lbImg.src = src;
+    lbImg.alt = caption;
     lbCaption.textContent = caption;
     lightbox.hidden = false;
     document.body.style.overflow = 'hidden';
@@ -269,10 +308,13 @@ import {
     document.body.style.overflow = '';
   }
   lbClose.addEventListener('click', closeLightbox);
-  lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
-  document.addEventListener('keydown', e => {
+  lightbox.addEventListener('click', function (e) {
+    if (e.target === lightbox) closeLightbox();
+  });
+  document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !lightbox.hidden) closeLightbox();
   });
+
 })();
 
 
@@ -280,19 +322,21 @@ import {
    3. LETTERS — Firestore + tiempo real
 ───────────────────────────────────────────────────────── */
 (function initLetters() {
-  const openBtn     = document.getElementById('openLetterForm');
-  const cancelBtn   = document.getElementById('cancelLetter');
-  const formWrapper = document.getElementById('letterFormWrapper');
-  const form        = document.getElementById('letterForm');
-  const grid        = document.getElementById('lettersGrid');
-  const textarea    = document.getElementById('letterContent');
-  const charCount   = document.getElementById('charCount');
+  var openBtn     = document.getElementById('openLetterForm');
+  var cancelBtn   = document.getElementById('cancelLetter');
+  var formWrapper = document.getElementById('letterFormWrapper');
+  var form        = document.getElementById('letterForm');
+  var grid        = document.getElementById('lettersGrid');
+  var textarea    = document.getElementById('letterContent');
+  var charCount   = document.getElementById('charCount');
 
   if (!openBtn || !form || !grid) return;
 
-  textarea.addEventListener('input', () => { charCount.textContent = textarea.value.length; });
+  textarea.addEventListener('input', function () {
+    charCount.textContent = textarea.value.length;
+  });
 
-  openBtn.addEventListener('click', () => {
+  openBtn.addEventListener('click', function () {
     form.dataset.editId = '';
     formWrapper.hidden = false;
     openBtn.hidden = true;
@@ -311,19 +355,19 @@ import {
   }
 
   function clearErrors() {
-    form.querySelectorAll('.form__error').forEach(el => (el.textContent = ''));
-    form.querySelectorAll('.form__input').forEach(el => el.removeAttribute('aria-invalid'));
+    form.querySelectorAll('.form__error').forEach(function (el) { el.textContent = ''; });
+    form.querySelectorAll('.form__input').forEach(function (el) { el.removeAttribute('aria-invalid'); });
   }
 
   function showError(inputId, msg) {
-    const input = document.getElementById(inputId);
-    const error = input?.parentElement?.querySelector('.form__error');
+    var input = document.getElementById(inputId);
+    var error = input && input.parentElement.querySelector('.form__error');
     if (input) input.setAttribute('aria-invalid', 'true');
     if (error) error.textContent = msg;
   }
 
   function validateForm(data) {
-    let valid = true;
+    var valid = true;
     clearErrors();
     if (!data.title.trim())   { showError('letterTitle',   'El título es obligatorio.'); valid = false; }
     if (!data.type)            { showError('letterType',    'Elige un tipo de mensaje.'); valid = false; }
@@ -331,82 +375,76 @@ import {
     return valid;
   }
 
-  form.addEventListener('submit', async e => {
+  form.addEventListener('submit', function (e) {
     e.preventDefault();
-    const data = {
+    var data = {
       title:   form.elements['title'].value,
       type:    form.elements['type'].value,
-      content: form.elements['content'].value,
+      content: form.elements['content'].value
     };
     if (!validateForm(data)) return;
 
-    const editId    = form.dataset.editId;
-    const submitBtn = form.querySelector('[type="submit"]');
-    submitBtn.disabled = true;
+    var editId  = form.dataset.editId;
+    var btn     = form.querySelector('[type="submit"]');
+    btn.disabled = true;
 
-    try {
-      if (editId) {
-        await updateDoc(doc(db, 'letters', editId), data);
-      } else {
-        data.date = serverTimestamp();
-        await addDoc(collection(db, 'letters'), data);
-      }
-      resetForm();
-    } catch (err) {
-      console.error(err);
-      alert('Error al guardar el mensaje.');
-    } finally {
-      submitBtn.disabled = false;
-    }
+    var promise = editId
+      ? db.collection('letters').doc(editId).update(data)
+      : db.collection('letters').add(Object.assign({ date: firebase.firestore.FieldValue.serverTimestamp() }, data));
+
+    promise
+      .then(function () { resetForm(); })
+      .catch(function (err) { alert('Error al guardar: ' + err.message); })
+      .finally(function () { btn.disabled = false; });
   });
 
-  onSnapshot(query(collection(db, 'letters'), orderBy('date', 'desc')), snap => {
-    grid.querySelectorAll('.letter-card--dynamic').forEach(c => c.remove());
-    snap.docs.forEach(d => renderCard({ id: d.id, ...d.data() }));
+  db.collection('letters').orderBy('date', 'desc').onSnapshot(function (snap) {
+    grid.querySelectorAll('.letter-card--dynamic').forEach(function (c) { c.remove(); });
+    snap.docs.forEach(function (d) { renderCard(Object.assign({ id: d.id }, d.data())); });
   });
 
-  const tagClassMap = {
+  var tagClassMap = {
     carta: '', mensaje: 'letter-card__tag--mensaje',
-    poema: 'letter-card__tag--poema', promesa: 'letter-card__tag--promesa',
+    poema: 'letter-card__tag--poema', promesa: 'letter-card__tag--promesa'
   };
 
   function renderCard(letter) {
-    const card = document.createElement('article');
-    card.className  = 'letter-card letter-card--dynamic' + (letter.fulfilled ? ' letter-card--fulfilled' : '');
+    var card = document.createElement('article');
+    card.className = 'letter-card letter-card--dynamic' + (letter.fulfilled ? ' letter-card--fulfilled' : '');
     card.dataset.id = letter.id;
 
-    const tagClass  = tagClassMap[letter.type] || '';
-    const dateLabel = letter.date?.toDate
+    var tagClass  = tagClassMap[letter.type] || '';
+    var dateLabel = letter.date && letter.date.toDate
       ? letter.date.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
       : '';
-    const fulfillHtml = letter.type === 'promesa' ? `
-      <button class="letter-card__fulfill ${letter.fulfilled ? 'letter-card__fulfill--done' : ''}">
-        ${letter.fulfilled ? '✓ Cumplida' : '○ Marcar como cumplida'}
-      </button>` : '';
+    var fulfillHtml = letter.type === 'promesa'
+      ? '<button class="letter-card__fulfill' + (letter.fulfilled ? ' letter-card__fulfill--done' : '') + '">' +
+          (letter.fulfilled ? '✓ Cumplida' : '○ Marcar como cumplida') + '</button>'
+      : '';
 
-    card.innerHTML = `
-      <div class="letter-card__actions">
-        <button class="letter-card__edit"   title="Editar">✏️</button>
-        <button class="letter-card__delete" title="Eliminar">✕</button>
-      </div>
-      <header class="letter-card__header">
-        <span class="letter-card__tag ${tagClass}">${capitalize(letter.type)}</span>
-        <time class="letter-card__date">${dateLabel}</time>
-      </header>
-      <h3 class="letter-card__title">${escapeHtml(letter.title)}</h3>
-      <p class="letter-card__preview">${escapeHtml(letter.content)}</p>
-      <button class="letter-card__read-btn" aria-expanded="false">Leer completo</button>
-      <div class="letter-card__full" hidden>
-        ${escapeHtml(letter.content).split('\n').map(p => p ? `<p>${p}</p>` : '').join('')}
-      </div>
-      ${fulfillHtml}`;
+    card.innerHTML =
+      '<div class="letter-card__actions">' +
+        '<button class="letter-card__edit" title="Editar">✏️</button>' +
+        '<button class="letter-card__delete" title="Eliminar">✕</button>' +
+      '</div>' +
+      '<header class="letter-card__header">' +
+        '<span class="letter-card__tag ' + tagClass + '">' + capitalize(letter.type) + '</span>' +
+        '<time class="letter-card__date">' + dateLabel + '</time>' +
+      '</header>' +
+      '<h3 class="letter-card__title">' + escapeHtml(letter.title) + '</h3>' +
+      '<p class="letter-card__preview">' + escapeHtml(letter.content) + '</p>' +
+      '<button class="letter-card__read-btn" aria-expanded="false">Leer completo</button>' +
+      '<div class="letter-card__full" hidden>' +
+        escapeHtml(letter.content).split('\n').map(function (p) { return p ? '<p>' + p + '</p>' : ''; }).join('') +
+      '</div>' +
+      fulfillHtml;
 
-    card.querySelector('.letter-card__delete').addEventListener('click', () => {
+    card.querySelector('.letter-card__delete').addEventListener('click', function () {
       if (!confirm('¿Eliminar este mensaje?')) return;
-      deleteDoc(doc(db, 'letters', letter.id));
+      db.collection('letters').doc(letter.id).delete();
     });
 
-    card.querySelector('.letter-card__edit').addEventListener('click', () => {
+    card.querySelector('.letter-card__edit').addEventListener('click', function () {
       form.elements['title'].value   = letter.title;
       form.elements['type'].value    = letter.type;
       form.elements['content'].value = letter.content;
@@ -414,14 +452,13 @@ import {
       form.dataset.editId = letter.id;
       formWrapper.hidden = false;
       openBtn.hidden = true;
-      form.elements['title'].focus();
       formWrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
-    const fulfillBtn = card.querySelector('.letter-card__fulfill');
+    var fulfillBtn = card.querySelector('.letter-card__fulfill');
     if (fulfillBtn) {
-      fulfillBtn.addEventListener('click', () => {
-        updateDoc(doc(db, 'letters', letter.id), { fulfilled: !letter.fulfilled });
+      fulfillBtn.addEventListener('click', function () {
+        db.collection('letters').doc(letter.id).update({ fulfilled: !letter.fulfilled });
       });
     }
 
@@ -432,53 +469,54 @@ import {
 
 
 /* ─────────────────────────────────────────────────────────
-   4. METAS — bloc de notas + Firestore + tiempo real
+   4. METAS
 ───────────────────────────────────────────────────────── */
 (function initMetas() {
-  const list    = document.getElementById('metasList');
-  const input   = document.getElementById('metaInput');
-  const addBtn  = document.getElementById('metaAddBtn');
-  const countEl = document.getElementById('metasCount');
+  var list    = document.getElementById('metasList');
+  var input   = document.getElementById('metaInput');
+  var addBtn  = document.getElementById('metaAddBtn');
+  var countEl = document.getElementById('metasCount');
 
   if (!list) return;
 
   function addMeta() {
-    const text = input.value.trim();
+    var text = input.value.trim();
     if (!text) return;
-    addDoc(collection(db, 'metas'), {
-      text, completed: false, createdAt: serverTimestamp(),
+    db.collection('metas').add({
+      text: text,
+      completed: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     input.value = '';
     input.focus();
   }
 
   addBtn.addEventListener('click', addMeta);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') addMeta(); });
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') addMeta(); });
 
-  onSnapshot(query(collection(db, 'metas'), orderBy('createdAt', 'asc')), snap => {
+  db.collection('metas').orderBy('createdAt', 'asc').onSnapshot(function (snap) {
     list.innerHTML = '';
-    const docs  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const done  = docs.filter(d => d.completed).length;
-    countEl.textContent = `${done} / ${docs.length} cumplidas`;
+    var docs = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+    var done = docs.filter(function (d) { return d.completed; }).length;
+    countEl.textContent = done + ' / ' + docs.length + ' cumplidas';
     docs.forEach(renderMeta);
   });
 
   function renderMeta(meta) {
-    const li = document.createElement('li');
-    li.className  = 'notepad__item' + (meta.completed ? ' notepad__item--done' : '');
+    var li = document.createElement('li');
+    li.className = 'notepad__item' + (meta.completed ? ' notepad__item--done' : '');
     li.dataset.id = meta.id;
-    li.innerHTML = `
-      <input class="notepad__checkbox" type="checkbox" id="meta_${meta.id}"
-             ${meta.completed ? 'checked' : ''} />
-      <label class="notepad__text" for="meta_${meta.id}">${escapeHtml(meta.text)}</label>
-      <button class="notepad__delete" title="Eliminar">✕</button>`;
+    li.innerHTML =
+      '<input class="notepad__checkbox" type="checkbox" id="meta_' + meta.id + '" ' + (meta.completed ? 'checked' : '') + ' />' +
+      '<label class="notepad__text" for="meta_' + meta.id + '">' + escapeHtml(meta.text) + '</label>' +
+      '<button class="notepad__delete" title="Eliminar">✕</button>';
 
-    li.querySelector('.notepad__checkbox').addEventListener('change', e => {
-      updateDoc(doc(db, 'metas', meta.id), { completed: e.target.checked });
+    li.querySelector('.notepad__checkbox').addEventListener('change', function (e) {
+      db.collection('metas').doc(meta.id).update({ completed: e.target.checked });
     });
-    li.querySelector('.notepad__delete').addEventListener('click', () => {
+    li.querySelector('.notepad__delete').addEventListener('click', function () {
       if (!confirm('¿Eliminar esta meta?')) return;
-      deleteDoc(doc(db, 'metas', meta.id));
+      db.collection('metas').doc(meta.id).delete();
     });
     list.appendChild(li);
   }
@@ -488,45 +526,63 @@ import {
 /* ─────────────────────────────────────────────────────────
    5. READ-MORE
 ───────────────────────────────────────────────────────── */
-(function initReadMore() {
-  document.querySelectorAll('.letter-card:not(.letter-card--dynamic)').forEach(wireReadMore);
-})();
+document.querySelectorAll('.letter-card:not(.letter-card--dynamic)').forEach(wireReadMore);
 
 function wireReadMore(card) {
-  const btn  = card.querySelector('.letter-card__read-btn');
-  const full = card.querySelector('.letter-card__full');
+  var btn  = card.querySelector('.letter-card__read-btn');
+  var full = card.querySelector('.letter-card__full');
   if (!btn || !full) return;
-  btn.addEventListener('click', () => {
-    const expanded = btn.getAttribute('aria-expanded') === 'true';
+  btn.addEventListener('click', function () {
+    var expanded = btn.getAttribute('aria-expanded') === 'true';
     full.hidden = expanded;
     btn.setAttribute('aria-expanded', String(!expanded));
     btn.textContent = expanded ? 'Leer completo' : 'Cerrar';
   });
 }
 
+
 /* ─────────────────────────────────────────────────────────
    HELPERS
 ───────────────────────────────────────────────────────── */
-function compressImage(file, maxWidth = 1200, quality = 0.82) {
-  return new Promise((resolve, reject) => {
-    const reader  = new FileReader();
-    reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
-    reader.onload  = e => {
-      const img   = new Image();
-      img.onerror = () => reject(new Error('Formato no compatible. Usa JPG, PNG o WEBP.'));
-      img.onload  = () => {
-        let { width, height } = img;
-        if (width > maxWidth) { height = Math.round(height * maxWidth / width); width = maxWidth; }
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
+function compressImage(file, maxWidth, quality) {
+  maxWidth = maxWidth || 1200;
+  quality  = quality  || 0.82;
+
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+
+    reader.onerror = function () { reject(new Error('No se pudo leer el archivo.')); };
+
+    reader.onload = function (e) {
+      var img = new Image();
+
+      img.onerror = function () {
+        reject(new Error('Formato no compatible. Usa JPG, PNG o WEBP.'));
+      };
+
+      img.onload = function () {
+        var width  = img.width;
+        var height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round(height * maxWidth / width);
+          width  = maxWidth;
+        }
+
+        var canvas = document.createElement('canvas');
+        canvas.width  = width;
+        canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        canvas.toBlob(blob => {
+
+        canvas.toBlob(function (blob) {
           if (blob) resolve(blob);
           else reject(new Error('No se pudo comprimir la imagen.'));
         }, 'image/jpeg', quality);
       };
+
       img.src = e.target.result;
     };
+
     reader.readAsDataURL(file);
   });
 }
