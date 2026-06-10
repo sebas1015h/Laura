@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Para Ti, Mi Amor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════
+       NAVEGACIÓN
+  ═══════════════════════════════════════════════════════ -->
+  <nav class="navbar" id="navbar">
+    <div class="navbar__logo">
+      <span class="navbar__heart">♥</span> Para Ti
+    </div>
+    <ul class="navbar__links">
+      <li><a href="#inicio">Inicio</a></li>
+      <li><a href="#musica">Música</a></li>
+      <li><a href="#galeria">Galería</a></li>
+      <li><a href="#cartas">Cartas</a></li>
+    </ul>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════════════
+       HERO / INICIO
+  ═══════════════════════════════════════════════════════ -->
+  <section class="hero" id="inicio">
+    <div class="hero__particles" aria-hidden="true">
+      <span class="particle particle--1">✦</span>
+      <span class="particle particle--2">♥</span>
+      <span class="particle particle--3">✦</span>
+      <span class="particle particle--4">♥</span>
+      <span class="particle particle--5">✦</span>
+      <span class="particle particle--6">♥</span>
+    </div>
+
+    <div class="hero__content">
+      <p class="hero__subtitle">Un mensaje para ti...</p>
+
+      <!-- ✏️  EDITA ESTE MENSAJE — Es solo tuyo para escribir -->
+      <h1 class="hero__title">Tu nombre aquí</h1>
+      <p class="hero__message">
+        Escribe aquí tu mensaje principal. Puede ser tan largo o tan corto como quieras.
+        Solo reemplaza este texto con tus palabras desde el corazón. Nadie más que tú
+        sabe exactamente qué decirle a la persona más especial de tu vida.
+      </p>
+      <!-- ✏️  FIN DEL MENSAJE EDITABLE -->
+
+      <a href="#musica" class="hero__cta">
+        <span>Explorar</span>
+        <span class="hero__cta-arrow">↓</span>
+      </a>
+    </div>
+
+    <div class="hero__scroll-hint" aria-hidden="true">Desliza hacia abajo</div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════
+       REPRODUCTOR SPOTIFY
+  ═══════════════════════════════════════════════════════ -->
+  <section class="section section--music" id="musica">
+    <div class="container">
+      <header class="section__header">
+        <span class="section__eyebrow">Nuestra melodía</span>
+        <h2 class="section__title">Música para nosotros</h2>
+        <p class="section__desc">Cada canción cuenta una parte de nuestra historia.</p>
+      </header>
+
+      <div class="music__player-wrapper">
+        <!--
+          ✏️  CÓMO CAMBIAR LA PLAYLIST DE SPOTIFY:
+          1. Abre Spotify Web o App.
+          2. Ve a tu playlist, haz clic en "..." → "Compartir" → "Insertar lista de reproducción".
+          3. Copia el enlace del iframe que Spotify te da.
+          4. Pega el src de ese iframe en el atributo src del iframe de abajo.
+          El formato es:
+          https://open.spotify.com/embed/playlist/TU_ID_DE_PLAYLIST?utm_source=generator&theme=0
+        -->
+        <iframe
+          class="music__iframe"
+          src="https://open.spotify.com/embed/playlist/53V5xmjfYZ2eqPKvsQd8qn?utm_source=generator&si=9cc4bf79252c4bea&theme=0"
+          width="100%"
+          height="380"
+          frameborder="0"
+          allowfullscreen
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy"
+          title="Playlist romántica en Spotify"
+        ></iframe>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════
+       GALERÍA DE FOTOS
+  ═══════════════════════════════════════════════════════ -->
+  <section class="section section--gallery" id="galeria">
+    <div class="container">
+      <header class="section__header">
+        <span class="section__eyebrow">Nuestros momentos</span>
+        <h2 class="section__title">Galería de recuerdos</h2>
+        <p class="section__desc">Filtra por fecha para encontrar tus momentos favoritos.</p>
+      </header>
+
+      <!-- Filtros de fecha -->
+      <div class="gallery__filters" role="group" aria-label="Filtrar galería por fecha">
+        <button class="gallery__filter-btn gallery__filter-btn--active" data-filter="all">
+          Todos
+        </button>
+        <!-- ✏️  Agrega más botones de filtro siguiendo este patrón:
+             data-filter debe coincidir con data-date en las tarjetas -->
+        <button class="gallery__filter-btn" data-filter="2024-01">Enero 2024</button>
+        <button class="gallery__filter-btn" data-filter="2024-06">Junio 2024</button>
+        <button class="gallery__filter-btn" data-filter="2025-02">Feb 2025</button>
+        <button class="gallery__filter-btn" data-filter="2025-12">Dic 2025</button>
+      </div>
+
+      <!-- Grid de fotos
+           ✏️  CÓMO AGREGAR UNA FOTO:
+           1. Copia el bloque <figure> completo.
+           2. Cambia src="fotos/tu-foto.jpg" por la ruta de tu imagen.
+           3. Cambia data-date="YYYY-MM" al año y mes de la foto.
+           4. Cambia el alt y el <figcaption> con tu descripción.
+      -->
+      <div class="gallery__grid" id="galleryGrid">
+
+        <figure class="gallery__item" data-date="2024-01">
+          <img src="fotos/foto1.jpg" alt="Descripción de la foto 1" class="gallery__img" loading="lazy" />
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-title">Primer encuentro</span>
+            <span class="gallery__caption-date">Enero 2024</span>
+          </figcaption>
+        </figure>
+
+        <figure class="gallery__item" data-date="2024-01">
+          <img src="fotos/foto2.jpg" alt="Descripción de la foto 2" class="gallery__img" loading="lazy" />
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-title">Primer paseo</span>
+            <span class="gallery__caption-date">Enero 2024</span>
+          </figcaption>
+        </figure>
+
+        <figure class="gallery__item" data-date="2024-06">
+          <img src="fotos/foto3.jpg" alt="Descripción de la foto 3" class="gallery__img" loading="lazy" />
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-title">Verano juntos</span>
+            <span class="gallery__caption-date">Junio 2024</span>
+          </figcaption>
+        </figure>
+
+        <figure class="gallery__item" data-date="2024-06">
+          <img src="fotos/foto4.jpg" alt="Descripción de la foto 4" class="gallery__img" loading="lazy" />
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-title">Ese día especial</span>
+            <span class="gallery__caption-date">Junio 2024</span>
+          </figcaption>
+        </figure>
+
+        <figure class="gallery__item" data-date="2025-02">
+          <img src="fotos/foto5.jpg" alt="Descripción de la foto 5" class="gallery__img" loading="lazy" />
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-title">San Valentín</span>
+            <span class="gallery__caption-date">Feb 2025</span>
+          </figcaption>
+        </figure>
+
+        <figure class="gallery__item" data-date="2025-12">
+          <img src="fotos/foto6.jpg" alt="Descripción de la foto 6" class="gallery__img" loading="lazy" />
+          <figcaption class="gallery__caption">
+            <span class="gallery__caption-title">Navidad</span>
+            <span class="gallery__caption-date">Dic 2025</span>
+          </figcaption>
+        </figure>
+
+      </div>
+
+      <!-- Lightbox -->
+      <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Vista de imagen" hidden>
+        <button class="lightbox__close" id="lightboxClose" aria-label="Cerrar">&times;</button>
+        <img class="lightbox__img" id="lightboxImg" src="" alt="" />
+        <p class="lightbox__caption" id="lightboxCaption"></p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════
+       REPOSITORIO DE CARTAS Y MENSAJES
+  ═══════════════════════════════════════════════════════ -->
+  <section class="section section--letters" id="cartas">
+    <div class="container">
+      <header class="section__header">
+        <span class="section__eyebrow">Palabras del corazón</span>
+        <h2 class="section__title">Cartas &amp; Mensajes</h2>
+        <p class="section__desc">Un repositorio de todo lo que siento por ti.</p>
+      </header>
+
+      <!-- Botón para abrir el formulario -->
+      <div class="letters__actions">
+        <button class="btn btn--primary" id="openLetterForm">
+          + Agregar un mensaje
+        </button>
+      </div>
+
+      <!-- Formulario para nueva carta (oculto por defecto) -->
+      <div class="letters__form-wrapper" id="letterFormWrapper" hidden>
+        <form class="letters__form" id="letterForm" novalidate>
+          <div class="form__group">
+            <label class="form__label" for="letterTitle">Título</label>
+            <input
+              class="form__input"
+              type="text"
+              id="letterTitle"
+              name="title"
+              placeholder="Un título para este mensaje..."
+              maxlength="80"
+              required
+            />
+            <span class="form__error" role="alert"></span>
+          </div>
+
+          <div class="form__group">
+            <label class="form__label" for="letterType">Tipo</label>
+            <select class="form__input form__select" id="letterType" name="type" required>
+              <option value="">Selecciona un tipo</option>
+              <option value="carta">Carta</option>
+              <option value="mensaje">Mensaje</option>
+              <option value="poema">Poema</option>
+              <option value="promesa">Promesa</option>
+            </select>
+            <span class="form__error" role="alert"></span>
+          </div>
+
+          <div class="form__group">
+            <label class="form__label" for="letterContent">Contenido</label>
+            <textarea
+              class="form__input form__textarea"
+              id="letterContent"
+              name="content"
+              placeholder="Escribe aquí tu mensaje..."
+              maxlength="2000"
+              required
+            ></textarea>
+            <span class="form__char-count"><span id="charCount">0</span>/2000</span>
+            <span class="form__error" role="alert"></span>
+          </div>
+
+          <div class="form__actions">
+            <button type="button" class="btn btn--secondary" id="cancelLetter">Cancelar</button>
+            <button type="submit" class="btn btn--primary">Guardar mensaje</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Lista de cartas / mensajes -->
+      <div class="letters__grid" id="lettersGrid">
+        <!--
+          ✏️  CARTAS PREDEFINIDAS — Agrega aquí tus propias cartas iniciales.
+              Estas se muestran siempre (no se pueden borrar desde la UI).
+              Copia el bloque <article> completo para agregar más.
+        -->
+        <article class="letter-card letter-card--featured">
+          <header class="letter-card__header">
+            <span class="letter-card__tag">Carta</span>
+            <time class="letter-card__date" datetime="2024-01-01">1 Enero 2024</time>
+          </header>
+          <h3 class="letter-card__title">La primera vez que te vi...</h3>
+          <p class="letter-card__preview">
+            Escribe aquí el contenido de tu primera carta. Reemplaza este texto
+            con tus propias palabras. Puede ser tan larga como quieras.
+          </p>
+          <button class="letter-card__read-btn" aria-expanded="false">Leer completo</button>
+          <div class="letter-card__full" hidden>
+            <p>
+              Aquí va el texto completo de la carta. Cuando el usuario haga clic en
+              "Leer completo" este párrafo se revelará. Puedes incluir varios párrafos
+              separados o incluso un poema. ¡La elección es tuya!
+            </p>
+            <p>
+              Este es un segundo párrafo de ejemplo. Agrega todos los que necesites.
+            </p>
+          </div>
+        </article>
+
+        <article class="letter-card">
+          <header class="letter-card__header">
+            <span class="letter-card__tag letter-card__tag--promesa">Promesa</span>
+            <time class="letter-card__date" datetime="2024-02-14">14 Feb 2024</time>
+          </header>
+          <h3 class="letter-card__title">Mis promesas para ti</h3>
+          <p class="letter-card__preview">
+            Un texto de vista previa de tu promesa. Cambia esto por las primeras
+            líneas de tu promesa real.
+          </p>
+          <button class="letter-card__read-btn" aria-expanded="false">Leer completo</button>
+          <div class="letter-card__full" hidden>
+            <p>
+              El texto completo de tus promesas. Aquí puedes escribir todo lo que
+              quieras comprometerte a hacer o ser para esa persona especial.
+            </p>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════════════════════ -->
+  <footer class="footer">
+    <p class="footer__text">Hecho con <span class="footer__heart">♥</span> solo para ti.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

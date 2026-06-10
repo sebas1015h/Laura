@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#2A0A45"/>
+  <text x="50%" y="45%" text-anchor="middle" fill="#B07DD6" font-size="48">📷</text>
+  <text x="50%" y="62%" text-anchor="middle" fill="#8B3FB8" font-family="sans-serif" font-size="14">Agrega tu foto aquí</text>
+</svg>
