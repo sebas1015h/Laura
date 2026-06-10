@@ -208,42 +208,18 @@
       }
 
       progressWrap.hidden = false;
-      progressBar.style.width = '0%';
-      progressText.textContent = 'Comprimiendo...';
+      progressBar.style.width = '50%';
+      progressText.textContent = 'Comprimiendo imagen...';
 
       compressImage(file)
-        .then(function (compressed) {
-          progressText.textContent = 'Subiendo...';
-          var storageRef = storage.ref('photos/' + Date.now() + '.jpg');
-          var task = storageRef.put(compressed, { contentType: 'image/jpeg' });
-
-          task.on('state_changed',
-            function (snap) {
-              var pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
-              progressBar.style.width = pct + '%';
-              progressText.textContent = 'Subiendo... ' + pct + '%';
-            },
-            function (err) {
-              console.error('Storage error:', err);
-              progressWrap.hidden = true;
-              showError(storageErrMsg(err));
-              submitBtn.disabled = false;
-              submitBtn.textContent = 'Guardar foto';
-            },
-            function () {
-              storageRef.getDownloadURL().then(function (src) {
-                progressText.textContent = '¡Listo!';
-                guardarFoto(src, title, captionDate, dateVal, editId, editSrc);
-              }).catch(function (err) {
-                showError('No se pudo obtener la URL de la imagen: ' + err.message);
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Guardar foto';
-              });
-            }
-          );
+        .then(function (dataUrl) {
+          progressBar.style.width = '100%';
+          progressText.textContent = '¡Listo!';
+          guardarFoto(dataUrl, title, captionDate, dateVal, editId, editSrc);
         })
         .catch(function (err) {
-          showError(err.message || 'Error al comprimir la imagen.');
+          progressWrap.hidden = true;
+          showError(err.message || 'Error al procesar la imagen.');
           submitBtn.disabled = false;
           submitBtn.textContent = 'Guardar foto';
         });
@@ -281,17 +257,6 @@
         submitBtn.disabled = false;
         submitBtn.textContent = 'Guardar foto';
       });
-  }
-
-  function storageErrMsg(err) {
-    var code = err.code || '';
-    if (code.indexOf('unauthorized') !== -1 || code.indexOf('permission-denied') !== -1)
-      return 'Sin permiso para subir. Ve a Firebase Console → Storage → Reglas y actualiza la fecha de expiración.';
-    if (code.indexOf('quota') !== -1)
-      return 'Se agotó el almacenamiento de Firebase.';
-    if (code.indexOf('network') !== -1)
-      return 'Error de red. Verifica tu conexión e intenta de nuevo.';
-    return 'Error de Storage: ' + (err.message || code);
   }
 
   /* ── Lightbox ── */
@@ -545,8 +510,8 @@ function wireReadMore(card) {
    HELPERS
 ───────────────────────────────────────────────────────── */
 function compressImage(file, maxWidth, quality) {
-  maxWidth = maxWidth || 1200;
-  quality  = quality  || 0.82;
+  maxWidth = maxWidth || 900;
+  quality  = quality  || 0.78;
 
   return new Promise(function (resolve, reject) {
     var reader = new FileReader();
@@ -574,10 +539,9 @@ function compressImage(file, maxWidth, quality) {
         canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
 
-        canvas.toBlob(function (blob) {
-          if (blob) resolve(blob);
-          else reject(new Error('No se pudo comprimir la imagen.'));
-        }, 'image/jpeg', quality);
+        var dataUrl = canvas.toDataURL('image/jpeg', quality);
+        if (dataUrl && dataUrl.length > 50) resolve(dataUrl);
+        else reject(new Error('No se pudo comprimir la imagen.'));
       };
 
       img.src = e.target.result;
