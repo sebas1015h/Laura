@@ -31,8 +31,32 @@
   const progressText = document.getElementById('uploadText');
   const submitBtn    = document.getElementById('photoSubmitBtn');
   const formTitleEl  = document.getElementById('photoFormTitle');
+  const errorBox     = document.getElementById('photoError');
 
   if (!grid) return;
+
+  function showPhotoError(msg) {
+    errorBox.textContent = msg;
+    errorBox.hidden = false;
+  }
+
+  function clearPhotoError() {
+    errorBox.hidden = true;
+    errorBox.textContent = '';
+  }
+
+  function storageErrorMsg(err) {
+    const code = err?.code || '';
+    if (code.includes('unauthorized') || code.includes('permission-denied'))
+      return '⚠️ Sin permiso para subir fotos. Las reglas de Firebase Storage expiraron (30 días en modo prueba). Ve a Firebase Console → Storage → Reglas y cambia la fecha a 2027.';
+    if (code.includes('quota-exceeded'))
+      return '⚠️ Se agotó el espacio de almacenamiento en Firebase.';
+    if (code.includes('network') || err?.message?.includes('network') || err?.message?.includes('fetch'))
+      return '⚠️ Error de red. Verifica tu conexión a internet e intenta de nuevo.';
+    if (code.includes('canceled'))
+      return '⚠️ La subida fue cancelada.';
+    return `⚠️ Error inesperado: ${err?.message || code || 'desconocido'}. Revisa la consola (F12).`;
+  }
 
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -183,6 +207,7 @@
     const [year, month] = dateVal.split('-');
     const captionDate   = `${MESES[parseInt(month, 10) - 1]} ${year}`;
 
+    clearPhotoError();
     submitBtn.disabled    = true;
     submitBtn.textContent = 'Guardando...';
 
@@ -191,7 +216,13 @@
 
       if (fileInput.files.length > 0) {
         const file = fileInput.files[0];
-        const ref  = storage.ref(`photos/${Date.now()}.jpg`);
+
+        if (!file.type.startsWith('image/')) {
+          showPhotoError('⚠️ El archivo seleccionado no es una imagen válida.');
+          return;
+        }
+
+        const ref = storage.ref(`photos/${Date.now()}.jpg`);
 
         progressWrap.hidden      = false;
         progressBar.style.width  = '0%';
@@ -218,7 +249,10 @@
         progressText.textContent = '¡Listo!';
       }
 
-      if (!src) { alert('Sube una foto o pega una URL de imagen.'); return; }
+      if (!src) {
+        showPhotoError('⚠️ Sube una foto o pega una URL de imagen.');
+        return;
+      }
 
       const data = {
         src,
@@ -237,8 +271,9 @@
 
       closeForm();
     } catch (err) {
-      console.error(err);
-      alert('Error al guardar la foto. Revisa la consola.');
+      console.error('Error al guardar foto:', err);
+      progressWrap.hidden = true;
+      showPhotoError(storageErrorMsg(err));
     } finally {
       submitBtn.disabled    = false;
       submitBtn.textContent = 'Guardar foto';

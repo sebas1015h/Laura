@@ -857,6 +857,19 @@ a {
 
 .gallery__upload-progress[hidden] { display: none; }
 
+.form__error-box {
+  padding: 0.75rem var(--space-sm);
+  background: rgba(229, 57, 53, 0.12);
+  border: 1px solid rgba(229, 57, 53, 0.4);
+  border-radius: var(--radius-sm);
+  color: #EF9A9A;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-bottom: var(--space-sm);
+}
+
+.form__error-box[hidden] { display: none; }
+
 .gallery__upload-bar-wrapper {
   width: 100%;
   height: 6px;
