@@ -16,7 +16,7 @@
   ═══════════════════════════════════════════════════════ -->
   <nav class="navbar" id="navbar">
     <div class="navbar__logo">
-      <span class="navbar__heart">♥</span> Para Ti
+      <span class="navbar__heart">♥</span> Para mi bebe
     </div>
     <ul class="navbar__links">
       <li><a href="#inicio">Inicio</a></li>
@@ -44,11 +44,15 @@
       <p class="hero__subtitle">Un mensaje para ti...</p>
 
       <!-- ✏️  EDITA ESTE MENSAJE — Es solo tuyo para escribir -->
-      <h1 class="hero__title">Tu nombre aquí</h1>
+      <h1 class="hero__title">Mi amor</h1>
       <p class="hero__message">
-        Escribe aquí tu mensaje principal. Puede ser tan largo o tan corto como quieras.
-        Solo reemplaza este texto con tus palabras desde el corazón. Nadie más que tú
-        sabe exactamente qué decirle a la persona más especial de tu vida.
+       Soy un tonto y mil veces me equivoco, no pienso para hablar pero lo intento, soy torpe con las palabras pero lo intento, 
+       no lo se todo pero lo intento, simplemente no soy perfecto, no tengo todos los lujos, ni los diamantes mas brillantes del mundo, pero el tenerte a ti en mi vida me hace perfecto, 
+       el tenerte a ti me hace el hombre mas rico del mundo, al poder amanecer a tu lado y poder ver tus ojos, al tener un dia malo, bueno, regular y saber que la unica persona que quiero en esos momentos es a ti, 
+       el poder compartir mis momentos contigo, mis miedos, mis secretos, mis sueños, mis aspiraciones, y mujer, mi sueño, mi aspiracion mas grande de la vida es usted, siempre me acuesto pensando en tener todo con usted, una vida,
+       unos hijos, una familia, un hogar, viajar, conocer, comer, reir, llorar, envejecer, pero a su lado, quiero todo a su lado, quiero vivir a su lado, quiero morir a su lado, quiero ser un tonto a su lado, quiero ser un torpe a su lado, quiero ser un imperfecto a su lado, quiero ser un hombre a su lado, quiero ser un padre a su lado, quiero ser un abuelo a su lado, quiero ser todo lo que pueda ser por usted y para usted, y si eso no es amor... No se que lo sea,
+       pero de lo que si estoy seguro es que lo que siento por usted es lo mas grande que he sentido por alguien, y no se si es amor, pero se que es algo tan grande que me hace querer ser mejor cada dia, me hace querer ser un mejor hombre, un mejor hijo, un mejor hermano, un mejor amigo, un mejor todo, solo por usted, solo para usted, solo a su lado.
+       Y eso significa usted para mi, usted es mi suspiro, mi aliento, mi fuerza, mi debilidad, y sobre todo, usted es mi anhelo, la razon por la que trabajo duro, en donde cada logro, cada meta la quiero a su lado, la quiero ver crecer como persona, como mujer, como ser humano, y quiero crecer a su lado, quiero ser testigo de su vida, de sus logros, de sus sueños cumplidos, y quiero ser parte de eso, quiero ser parte de su historia, quiero ser parte de su vida, quiero ser parte de usted, y si eso no es amor... No se que lo sea.
       </p>
       <!-- ✏️  FIN DEL MENSAJE EDITABLE -->
 
@@ -234,56 +238,8 @@
         </form>
       </div>
 
-      <!-- Lista de cartas / mensajes -->
-      <div class="letters__grid" id="lettersGrid">
-        <!--
-          ✏️  CARTAS PREDEFINIDAS — Agrega aquí tus propias cartas iniciales.
-              Estas se muestran siempre (no se pueden borrar desde la UI).
-              Copia el bloque <article> completo para agregar más.
-        -->
-        <article class="letter-card letter-card--featured">
-          <header class="letter-card__header">
-            <span class="letter-card__tag">Carta</span>
-            <time class="letter-card__date" datetime="2024-01-01">1 Enero 2024</time>
-          </header>
-          <h3 class="letter-card__title">La primera vez que te vi...</h3>
-          <p class="letter-card__preview">
-            Escribe aquí el contenido de tu primera carta. Reemplaza este texto
-            con tus propias palabras. Puede ser tan larga como quieras.
-          </p>
-          <button class="letter-card__read-btn" aria-expanded="false">Leer completo</button>
-          <div class="letter-card__full" hidden>
-            <p>
-              Aquí va el texto completo de la carta. Cuando el usuario haga clic en
-              "Leer completo" este párrafo se revelará. Puedes incluir varios párrafos
-              separados o incluso un poema. ¡La elección es tuya!
-            </p>
-            <p>
-              Este es un segundo párrafo de ejemplo. Agrega todos los que necesites.
-            </p>
-          </div>
-        </article>
-
-        <article class="letter-card">
-          <header class="letter-card__header">
-            <span class="letter-card__tag letter-card__tag--promesa">Promesa</span>
-            <time class="letter-card__date" datetime="2024-02-14">14 Feb 2024</time>
-          </header>
-          <h3 class="letter-card__title">Mis promesas para ti</h3>
-          <p class="letter-card__preview">
-            Un texto de vista previa de tu promesa. Cambia esto por las primeras
-            líneas de tu promesa real.
-          </p>
-          <button class="letter-card__read-btn" aria-expanded="false">Leer completo</button>
-          <div class="letter-card__full" hidden>
-            <p>
-              El texto completo de tus promesas. Aquí puedes escribir todo lo que
-              quieras comprometerte a hacer o ser para esa persona especial.
-            </p>
-          </div>
-        </article>
-
-      </div>
+      <!-- Lista de cartas / mensajes — poblada desde Firestore -->
+      <div class="letters__grid" id="lettersGrid"></div>
     </div>
   </section>
 
