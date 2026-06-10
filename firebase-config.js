@@ -1,6 +1,7 @@
-// ─── CONFIGURA AQUÍ TU PROYECTO FIREBASE ────────────────────
-// Pasos: Firebase Console → Tu proyecto → Configuración ⚙️
-//        → Tus aplicaciones → SDK → Config
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+import { getFirestore }  from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import { getStorage }    from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js';
+
 const firebaseConfig = {
   apiKey:            "AIzaSyCo-BYAcpAXmgL3DRDi5_R36ZUgQ8uPXQQ",
   authDomain:        "pagina-laura-c9d1b.firebaseapp.com",
@@ -10,7 +11,6 @@ const firebaseConfig = {
   appId:             "1:597072105986:web:7ade6ec67ba8a92a2a4d1b"
 };
 
-firebase.initializeApp(firebaseConfig);
-
-const db      = firebase.firestore();
-const storage = firebase.storage();
+const app = initializeApp(firebaseConfig);
+export const db      = getFirestore(app);
+export const storage = getStorage(app);

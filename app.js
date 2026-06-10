@@ -1,3 +1,12 @@
+import { db, storage } from './firebase-config.js';
+import {
+  collection, addDoc, updateDoc, deleteDoc, doc,
+  query, orderBy, onSnapshot, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import {
+  ref as sRef, uploadBytesResumable, getDownloadURL
+} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js';
+
 /* ─────────────────────────────────────────────────────────
    1. NAVBAR
 ───────────────────────────────────────────────────────── */
@@ -11,7 +20,7 @@
 
 
 /* ─────────────────────────────────────────────────────────
-   2. GALLERY — Firestore + Storage + tiempo real
+   2. GALLERY — Firebase Storage + Firestore + tiempo real
 ───────────────────────────────────────────────────────── */
 (function initGallery() {
   const grid         = document.getElementById('galleryGrid');
@@ -35,136 +44,111 @@
 
   if (!grid) return;
 
-  function showPhotoError(msg) {
-    errorBox.textContent = msg;
-    errorBox.hidden = false;
-  }
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  let currentFilter = 'all';
+  let allPhotos     = [];
 
-  function clearPhotoError() {
-    errorBox.hidden = true;
-    errorBox.textContent = '';
-  }
+  /* ── Errores ── */
+  function showPhotoError(msg) { errorBox.textContent = msg; errorBox.hidden = false; }
+  function clearPhotoError()   { errorBox.hidden = true; errorBox.textContent = ''; }
 
   function storageErrorMsg(err) {
     const code = err?.code || '';
     if (code.includes('unauthorized') || code.includes('permission-denied'))
-      return '⚠️ Sin permiso para subir fotos. Las reglas de Firebase Storage expiraron (30 días en modo prueba). Ve a Firebase Console → Storage → Reglas y cambia la fecha a 2027.';
+      return '⚠️ Sin permiso. Ve a Firebase Console → Storage → Reglas y cambia la fecha de expiración a 2027.';
     if (code.includes('quota-exceeded'))
-      return '⚠️ Se agotó el espacio de almacenamiento en Firebase.';
-    if (code.includes('network') || err?.message?.includes('network') || err?.message?.includes('fetch'))
-      return '⚠️ Error de red. Verifica tu conexión a internet e intenta de nuevo.';
-    if (code.includes('canceled'))
-      return '⚠️ La subida fue cancelada.';
-    return `⚠️ Error inesperado: ${err?.message || code || 'desconocido'}. Revisa la consola (F12).`;
+      return '⚠️ Se agotó el espacio de almacenamiento.';
+    if (code.includes('network') || err?.message?.includes('network'))
+      return '⚠️ Error de red. Verifica tu conexión e intenta de nuevo.';
+    return `⚠️ Error: ${err?.message || code || 'desconocido'}`;
   }
 
-  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-  let currentFilter = 'all';
-  let allPhotos     = [];
-
-  function labelFromFilter(dateFilter) {
-    const [y, m] = dateFilter.split('-');
+  /* ── Filtros ── */
+  function labelFromFilter(df) {
+    const [y, m] = df.split('-');
     return `${MESES[parseInt(m, 10) - 1]} ${y}`;
   }
 
-  /* ── Regenera botones de filtro según meses en Firestore ── */
   function updateFilters() {
     const months = [...new Set(allPhotos.map(p => p.dateFilter).filter(Boolean))].sort();
     filtersDiv.innerHTML = '';
+    const allEl = makeFilterBtn('all', 'Todos');
+    filtersDiv.appendChild(allEl);
+    months.forEach(m => filtersDiv.appendChild(makeFilterBtn(m, labelFromFilter(m))));
+  }
 
-    const allBtnEl = document.createElement('button');
-    allBtnEl.className = 'gallery__filter-btn' + (currentFilter === 'all' ? ' gallery__filter-btn--active' : '');
-    allBtnEl.dataset.filter = 'all';
-    allBtnEl.textContent = 'Todos';
-    allBtnEl.addEventListener('click', () => applyFilter('all', allBtnEl));
-    filtersDiv.appendChild(allBtnEl);
-
-    months.forEach(m => {
-      const btn = document.createElement('button');
-      btn.className = 'gallery__filter-btn' + (currentFilter === m ? ' gallery__filter-btn--active' : '');
-      btn.dataset.filter = m;
-      btn.textContent = labelFromFilter(m);
-      btn.addEventListener('click', () => applyFilter(m, btn));
-      filtersDiv.appendChild(btn);
+  function makeFilterBtn(filter, label) {
+    const btn = document.createElement('button');
+    btn.className = 'gallery__filter-btn' + (currentFilter === filter ? ' gallery__filter-btn--active' : '');
+    btn.dataset.filter = filter;
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      currentFilter = filter;
+      filtersDiv.querySelectorAll('.gallery__filter-btn')
+        .forEach(b => b.classList.toggle('gallery__filter-btn--active', b === btn));
+      renderPhotos();
     });
+    return btn;
   }
 
-  function applyFilter(filter, clickedBtn) {
-    currentFilter = filter;
-    filtersDiv.querySelectorAll('.gallery__filter-btn').forEach(b =>
-      b.classList.toggle('gallery__filter-btn--active', b === clickedBtn)
-    );
-    renderPhotos();
-  }
-
-  /* ── Renderiza las fotos filtradas ── */
+  /* ── Renderizado ── */
   function renderPhotos() {
     grid.innerHTML = '';
     const list = currentFilter === 'all'
-      ? allPhotos
-      : allPhotos.filter(p => p.dateFilter === currentFilter);
+      ? allPhotos : allPhotos.filter(p => p.dateFilter === currentFilter);
     list.forEach(createPhotoEl);
   }
 
   function createPhotoEl(photo) {
     const fig = document.createElement('figure');
-    fig.className    = 'gallery__item';
+    fig.className = 'gallery__item';
     fig.dataset.date = photo.dateFilter;
     fig.dataset.id   = photo.id;
-
     fig.innerHTML = `
       <div class="gallery__item-actions">
-        <button class="gallery__item-btn gallery__item-btn--edit"   aria-label="Editar"   title="Editar">✏️</button>
-        <button class="gallery__item-btn gallery__item-btn--delete" aria-label="Eliminar" title="Eliminar">🗑️</button>
+        <button class="gallery__item-btn gallery__item-btn--edit"   title="Editar">✏️</button>
+        <button class="gallery__item-btn gallery__item-btn--delete" title="Eliminar">🗑️</button>
       </div>
       <img src="${escapeAttr(photo.src)}" alt="${escapeAttr(photo.captionTitle || '')}"
            class="gallery__img" loading="lazy" />
       <figcaption class="gallery__caption">
         <span class="gallery__caption-title">${escapeHtml(photo.captionTitle || '')}</span>
         <span class="gallery__caption-date">${escapeHtml(photo.captionDate  || '')}</span>
-      </figcaption>
-    `;
+      </figcaption>`;
 
     fig.querySelector('.gallery__img').addEventListener('click', e => {
       e.stopPropagation();
       openLightbox(photo.src, photo.captionTitle || '');
     });
-
     fig.querySelector('.gallery__item-btn--edit').addEventListener('click', e => {
-      e.stopPropagation();
-      openEditForm(photo);
+      e.stopPropagation(); openEditForm(photo);
     });
-
     fig.querySelector('.gallery__item-btn--delete').addEventListener('click', e => {
       e.stopPropagation();
       if (!confirm('¿Eliminar esta foto?')) return;
-      db.collection('photos').doc(photo.id).delete();
+      deleteDoc(doc(db, 'photos', photo.id));
     });
-
     grid.appendChild(fig);
   }
 
-  /* ── Firestore: escucha cambios en tiempo real ── */
-  db.collection('photos')
-    .orderBy('createdAt', 'asc')
-    .onSnapshot(snapshot => {
-      allPhotos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      updateFilters();
-      renderPhotos();
-    });
+  /* ── Tiempo real ── */
+  onSnapshot(query(collection(db, 'photos'), orderBy('createdAt', 'asc')), snap => {
+    allPhotos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    updateFilters();
+    renderPhotos();
+  });
 
-  /* ── Abrir / cerrar formulario ── */
+  /* ── Formulario ── */
   addBtn.addEventListener('click', () => {
     photoForm.reset();
-    photoForm.dataset.editId  = '';
-    photoForm.dataset.editSrc = '';
-    formTitleEl.textContent   = 'Agregar foto';
-    urlInput.value            = '';
-    progressWrap.hidden       = true;
-    formWrap.hidden           = false;
-    addBtn.hidden             = true;
+    photoForm.dataset.editId = photoForm.dataset.editSrc = '';
+    formTitleEl.textContent = 'Agregar foto';
+    urlInput.value = '';
+    progressWrap.hidden = true;
+    clearPhotoError();
+    formWrap.hidden = false;
+    addBtn.hidden = true;
     formWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
 
@@ -172,11 +156,11 @@
 
   function closeForm() {
     formWrap.hidden = true;
-    addBtn.hidden   = false;
+    addBtn.hidden = false;
     photoForm.reset();
-    photoForm.dataset.editId  = '';
-    photoForm.dataset.editSrc = '';
+    photoForm.dataset.editId = photoForm.dataset.editSrc = '';
     progressWrap.hidden = true;
+    clearPhotoError();
   }
 
   function openEditForm(photo) {
@@ -185,29 +169,30 @@
     formTitleEl.textContent   = 'Editar foto';
     document.getElementById('photoTitle').value = photo.captionTitle || '';
     document.getElementById('photoDate').value  = photo.dateFilter   || '';
-    urlInput.value      = photo.src || '';
+    urlInput.value = photo.src || '';
     progressWrap.hidden = true;
-    formWrap.hidden     = false;
-    addBtn.hidden       = true;
+    clearPhotoError();
+    formWrap.hidden = false;
+    addBtn.hidden = true;
     formWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  /* ── Submit: subir a Storage o guardar URL ── */
+  /* ── Submit: comprimir → subir → guardar ── */
   photoForm.addEventListener('submit', async e => {
     e.preventDefault();
+    clearPhotoError();
 
     const title   = document.getElementById('photoTitle').value.trim();
     const dateVal = document.getElementById('photoDate').value;
     const editId  = photoForm.dataset.editId;
     const editSrc = photoForm.dataset.editSrc;
 
-    if (!title)   { alert('Agrega un título para la foto.'); return; }
-    if (!dateVal) { alert('Selecciona el mes y año.');       return; }
+    if (!title)   { showPhotoError('⚠️ Agrega un título para la foto.'); return; }
+    if (!dateVal) { showPhotoError('⚠️ Selecciona el mes y año.');       return; }
 
     const [year, month] = dateVal.split('-');
     const captionDate   = `${MESES[parseInt(month, 10) - 1]} ${year}`;
 
-    clearPhotoError();
     submitBtn.disabled    = true;
     submitBtn.textContent = 'Guardando...';
 
@@ -218,22 +203,22 @@
         const file = fileInput.files[0];
 
         if (!file.type.startsWith('image/')) {
-          showPhotoError('⚠️ El archivo seleccionado no es una imagen válida.');
+          showPhotoError('⚠️ El archivo no es una imagen. Usa JPG, PNG o WEBP.');
           return;
         }
 
-        const ref = storage.ref(`photos/${Date.now()}.jpg`);
-
-        progressWrap.hidden      = false;
-        progressBar.style.width  = '0%';
-        progressText.textContent = 'Comprimiendo imagen...';
+        progressWrap.hidden     = false;
+        progressBar.style.width = '0%';
+        progressText.textContent = 'Comprimiendo...';
 
         const compressed = await compressImage(file);
 
         progressText.textContent = 'Subiendo...';
 
+        const fileRef = sRef(storage, `photos/${Date.now()}.jpg`);
+        const task    = uploadBytesResumable(fileRef, compressed, { contentType: 'image/jpeg' });
+
         await new Promise((resolve, reject) => {
-          const task = ref.put(compressed, { contentType: 'image/jpeg' });
           task.on('state_changed',
             snap => {
               const pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
@@ -245,33 +230,24 @@
           );
         });
 
-        src = await ref.getDownloadURL();
+        src = await getDownloadURL(fileRef);
         progressText.textContent = '¡Listo!';
       }
 
-      if (!src) {
-        showPhotoError('⚠️ Sube una foto o pega una URL de imagen.');
-        return;
-      }
+      if (!src) { showPhotoError('⚠️ Sube una foto o pega una URL de imagen.'); return; }
 
-      const data = {
-        src,
-        alt:          title,
-        captionTitle: title,
-        captionDate,
-        dateFilter:   dateVal,
-      };
+      const data = { src, alt: title, captionTitle: title, captionDate, dateFilter: dateVal };
 
       if (editId) {
-        await db.collection('photos').doc(editId).update(data);
+        await updateDoc(doc(db, 'photos', editId), data);
       } else {
-        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-        await db.collection('photos').add(data);
+        data.createdAt = serverTimestamp();
+        await addDoc(collection(db, 'photos'), data);
       }
 
       closeForm();
     } catch (err) {
-      console.error('Error al guardar foto:', err);
+      console.error('Error foto:', err);
       progressWrap.hidden = true;
       showPhotoError(storageErrorMsg(err));
     } finally {
@@ -282,19 +258,16 @@
 
   /* ── Lightbox ── */
   function openLightbox(src, caption) {
-    lbImg.src             = src;
-    lbImg.alt             = caption;
+    lbImg.src = src; lbImg.alt = caption;
     lbCaption.textContent = caption;
-    lightbox.hidden       = false;
+    lightbox.hidden = false;
     document.body.style.overflow = 'hidden';
     lbClose.focus();
   }
-
   function closeLightbox() {
     lightbox.hidden = true;
     document.body.style.overflow = '';
   }
-
   lbClose.addEventListener('click', closeLightbox);
   lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
   document.addEventListener('keydown', e => {
@@ -317,14 +290,12 @@
 
   if (!openBtn || !form || !grid) return;
 
-  textarea.addEventListener('input', () => {
-    charCount.textContent = textarea.value.length;
-  });
+  textarea.addEventListener('input', () => { charCount.textContent = textarea.value.length; });
 
   openBtn.addEventListener('click', () => {
     form.dataset.editId = '';
-    formWrapper.hidden  = false;
-    openBtn.hidden      = true;
+    formWrapper.hidden = false;
+    openBtn.hidden = true;
     form.elements['title'].focus();
   });
 
@@ -332,11 +303,11 @@
 
   function resetForm() {
     form.reset();
-    form.dataset.editId   = '';
+    form.dataset.editId = '';
     charCount.textContent = '0';
     clearErrors();
     formWrapper.hidden = true;
-    openBtn.hidden     = false;
+    openBtn.hidden = false;
   }
 
   function clearErrors() {
@@ -344,11 +315,11 @@
     form.querySelectorAll('.form__input').forEach(el => el.removeAttribute('aria-invalid'));
   }
 
-  function showError(inputId, message) {
+  function showError(inputId, msg) {
     const input = document.getElementById(inputId);
     const error = input?.parentElement?.querySelector('.form__error');
     if (input) input.setAttribute('aria-invalid', 'true');
-    if (error) error.textContent = message;
+    if (error) error.textContent = msg;
   }
 
   function validateForm(data) {
@@ -367,7 +338,6 @@
       type:    form.elements['type'].value,
       content: form.elements['content'].value,
     };
-
     if (!validateForm(data)) return;
 
     const editId    = form.dataset.editId;
@@ -376,10 +346,10 @@
 
     try {
       if (editId) {
-        await db.collection('letters').doc(editId).update(data);
+        await updateDoc(doc(db, 'letters', editId), data);
       } else {
-        data.date = firebase.firestore.FieldValue.serverTimestamp();
-        await db.collection('letters').add(data);
+        data.date = serverTimestamp();
+        await addDoc(collection(db, 'letters'), data);
       }
       resetForm();
     } catch (err) {
@@ -390,23 +360,18 @@
     }
   });
 
-  /* ── Firestore: escucha cambios en tiempo real ── */
-  db.collection('letters')
-    .orderBy('date', 'desc')
-    .onSnapshot(snapshot => {
-      grid.querySelectorAll('.letter-card--dynamic').forEach(c => c.remove());
-      snapshot.docs.forEach(doc => renderCard({ id: doc.id, ...doc.data() }));
-    });
+  onSnapshot(query(collection(db, 'letters'), orderBy('date', 'desc')), snap => {
+    grid.querySelectorAll('.letter-card--dynamic').forEach(c => c.remove());
+    snap.docs.forEach(d => renderCard({ id: d.id, ...d.data() }));
+  });
 
   const tagClassMap = {
-    carta:   '',
-    mensaje: 'letter-card__tag--mensaje',
-    poema:   'letter-card__tag--poema',
-    promesa: 'letter-card__tag--promesa',
+    carta: '', mensaje: 'letter-card__tag--mensaje',
+    poema: 'letter-card__tag--poema', promesa: 'letter-card__tag--promesa',
   };
 
   function renderCard(letter) {
-    const card      = document.createElement('article');
+    const card = document.createElement('article');
     card.className  = 'letter-card letter-card--dynamic' + (letter.fulfilled ? ' letter-card--fulfilled' : '');
     card.dataset.id = letter.id;
 
@@ -414,17 +379,15 @@
     const dateLabel = letter.date?.toDate
       ? letter.date.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
       : '';
-
     const fulfillHtml = letter.type === 'promesa' ? `
-      <button class="letter-card__fulfill ${letter.fulfilled ? 'letter-card__fulfill--done' : ''}"
-              aria-label="${letter.fulfilled ? 'Quitar cumplida' : 'Marcar como cumplida'}">
+      <button class="letter-card__fulfill ${letter.fulfilled ? 'letter-card__fulfill--done' : ''}">
         ${letter.fulfilled ? '✓ Cumplida' : '○ Marcar como cumplida'}
       </button>` : '';
 
     card.innerHTML = `
       <div class="letter-card__actions">
-        <button class="letter-card__edit"   aria-label="Editar"   title="Editar">✏️</button>
-        <button class="letter-card__delete" aria-label="Eliminar" title="Eliminar">✕</button>
+        <button class="letter-card__edit"   title="Editar">✏️</button>
+        <button class="letter-card__delete" title="Eliminar">✕</button>
       </div>
       <header class="letter-card__header">
         <span class="letter-card__tag ${tagClass}">${capitalize(letter.type)}</span>
@@ -436,22 +399,21 @@
       <div class="letter-card__full" hidden>
         ${escapeHtml(letter.content).split('\n').map(p => p ? `<p>${p}</p>` : '').join('')}
       </div>
-      ${fulfillHtml}
-    `;
+      ${fulfillHtml}`;
 
     card.querySelector('.letter-card__delete').addEventListener('click', () => {
       if (!confirm('¿Eliminar este mensaje?')) return;
-      db.collection('letters').doc(letter.id).delete();
+      deleteDoc(doc(db, 'letters', letter.id));
     });
 
     card.querySelector('.letter-card__edit').addEventListener('click', () => {
       form.elements['title'].value   = letter.title;
       form.elements['type'].value    = letter.type;
       form.elements['content'].value = letter.content;
-      charCount.textContent          = letter.content.length;
-      form.dataset.editId            = letter.id;
+      charCount.textContent = letter.content.length;
+      form.dataset.editId = letter.id;
       formWrapper.hidden = false;
-      openBtn.hidden     = true;
+      openBtn.hidden = true;
       form.elements['title'].focus();
       formWrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
@@ -459,7 +421,7 @@
     const fulfillBtn = card.querySelector('.letter-card__fulfill');
     if (fulfillBtn) {
       fulfillBtn.addEventListener('click', () => {
-        db.collection('letters').doc(letter.id).update({ fulfilled: !letter.fulfilled });
+        updateDoc(doc(db, 'letters', letter.id), { fulfilled: !letter.fulfilled });
       });
     }
 
@@ -478,15 +440,13 @@
   const addBtn  = document.getElementById('metaAddBtn');
   const countEl = document.getElementById('metasCount');
 
-  if (!list || !db) return;
+  if (!list) return;
 
   function addMeta() {
     const text = input.value.trim();
     if (!text) return;
-    db.collection('metas').add({
-      text,
-      completed: false,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    addDoc(collection(db, 'metas'), {
+      text, completed: false, createdAt: serverTimestamp(),
     });
     input.value = '';
     input.focus();
@@ -495,45 +455,38 @@
   addBtn.addEventListener('click', addMeta);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') addMeta(); });
 
-  db.collection('metas')
-    .orderBy('createdAt', 'asc')
-    .onSnapshot(snapshot => {
-      list.innerHTML = '';
-      const docs  = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const total = docs.length;
-      const done  = docs.filter(d => d.completed).length;
-      countEl.textContent = `${done} / ${total} cumplidas`;
-      docs.forEach(renderMeta);
-    });
+  onSnapshot(query(collection(db, 'metas'), orderBy('createdAt', 'asc')), snap => {
+    list.innerHTML = '';
+    const docs  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const done  = docs.filter(d => d.completed).length;
+    countEl.textContent = `${done} / ${docs.length} cumplidas`;
+    docs.forEach(renderMeta);
+  });
 
   function renderMeta(meta) {
     const li = document.createElement('li');
     li.className  = 'notepad__item' + (meta.completed ? ' notepad__item--done' : '');
     li.dataset.id = meta.id;
-
     li.innerHTML = `
       <input class="notepad__checkbox" type="checkbox" id="meta_${meta.id}"
-             ${meta.completed ? 'checked' : ''} aria-label="Marcar como cumplida" />
+             ${meta.completed ? 'checked' : ''} />
       <label class="notepad__text" for="meta_${meta.id}">${escapeHtml(meta.text)}</label>
-      <button class="notepad__delete" aria-label="Eliminar" title="Eliminar">✕</button>
-    `;
+      <button class="notepad__delete" title="Eliminar">✕</button>`;
 
     li.querySelector('.notepad__checkbox').addEventListener('change', e => {
-      db.collection('metas').doc(meta.id).update({ completed: e.target.checked });
+      updateDoc(doc(db, 'metas', meta.id), { completed: e.target.checked });
     });
-
     li.querySelector('.notepad__delete').addEventListener('click', () => {
       if (!confirm('¿Eliminar esta meta?')) return;
-      db.collection('metas').doc(meta.id).delete();
+      deleteDoc(doc(db, 'metas', meta.id));
     });
-
     list.appendChild(li);
   }
 })();
 
 
 /* ─────────────────────────────────────────────────────────
-   5. READ-MORE — cartas fijas del HTML
+   5. READ-MORE
 ───────────────────────────────────────────────────────── */
 (function initReadMore() {
   document.querySelectorAll('.letter-card:not(.letter-card--dynamic)').forEach(wireReadMore);
@@ -545,7 +498,7 @@ function wireReadMore(card) {
   if (!btn || !full) return;
   btn.addEventListener('click', () => {
     const expanded = btn.getAttribute('aria-expanded') === 'true';
-    full.hidden    = expanded;
+    full.hidden = expanded;
     btn.setAttribute('aria-expanded', String(!expanded));
     btn.textContent = expanded ? 'Leer completo' : 'Cerrar';
   });
@@ -555,21 +508,22 @@ function wireReadMore(card) {
    HELPERS
 ───────────────────────────────────────────────────────── */
 function compressImage(file, maxWidth = 1200, quality = 0.82) {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const reader  = new FileReader();
-    reader.onload = e => {
-      const img    = new Image();
-      img.onload   = () => {
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+    reader.onload  = e => {
+      const img   = new Image();
+      img.onerror = () => reject(new Error('Formato no compatible. Usa JPG, PNG o WEBP.'));
+      img.onload  = () => {
         let { width, height } = img;
-        if (width > maxWidth) {
-          height = Math.round(height * maxWidth / width);
-          width  = maxWidth;
-        }
+        if (width > maxWidth) { height = Math.round(height * maxWidth / width); width = maxWidth; }
         const canvas = document.createElement('canvas');
-        canvas.width  = width;
-        canvas.height = height;
+        canvas.width = width; canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
+        canvas.toBlob(blob => {
+          if (blob) resolve(blob);
+          else reject(new Error('No se pudo comprimir la imagen.'));
+        }, 'image/jpeg', quality);
       };
       img.src = e.target.result;
     };
@@ -579,11 +533,8 @@ function compressImage(file, maxWidth = 1200, quality = 0.82) {
 
 function escapeHtml(str) {
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 function escapeAttr(str) {
