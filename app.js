@@ -368,13 +368,19 @@
 
   function renderCard(letter) {
     const card      = document.createElement('article');
-    card.className  = 'letter-card letter-card--dynamic';
+    card.className  = 'letter-card letter-card--dynamic' + (letter.fulfilled ? ' letter-card--fulfilled' : '');
     card.dataset.id = letter.id;
 
     const tagClass  = tagClassMap[letter.type] || '';
     const dateLabel = letter.date?.toDate
       ? letter.date.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
       : '';
+
+    const fulfillHtml = letter.type === 'promesa' ? `
+      <button class="letter-card__fulfill ${letter.fulfilled ? 'letter-card__fulfill--done' : ''}"
+              aria-label="${letter.fulfilled ? 'Quitar cumplida' : 'Marcar como cumplida'}">
+        ${letter.fulfilled ? '✓ Cumplida' : '○ Marcar como cumplida'}
+      </button>` : '';
 
     card.innerHTML = `
       <div class="letter-card__actions">
@@ -391,6 +397,7 @@
       <div class="letter-card__full" hidden>
         ${escapeHtml(letter.content).split('\n').map(p => p ? `<p>${p}</p>` : '').join('')}
       </div>
+      ${fulfillHtml}
     `;
 
     card.querySelector('.letter-card__delete').addEventListener('click', () => {
@@ -410,6 +417,13 @@
       formWrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
+    const fulfillBtn = card.querySelector('.letter-card__fulfill');
+    if (fulfillBtn) {
+      fulfillBtn.addEventListener('click', () => {
+        db.collection('letters').doc(letter.id).update({ fulfilled: !letter.fulfilled });
+      });
+    }
+
     wireReadMore(card);
     grid.appendChild(card);
   }
@@ -417,7 +431,70 @@
 
 
 /* ─────────────────────────────────────────────────────────
-   4. READ-MORE — cartas fijas del HTML
+   4. METAS — bloc de notas + Firestore + tiempo real
+───────────────────────────────────────────────────────── */
+(function initMetas() {
+  const list    = document.getElementById('metasList');
+  const input   = document.getElementById('metaInput');
+  const addBtn  = document.getElementById('metaAddBtn');
+  const countEl = document.getElementById('metasCount');
+
+  if (!list || !db) return;
+
+  function addMeta() {
+    const text = input.value.trim();
+    if (!text) return;
+    db.collection('metas').add({
+      text,
+      completed: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    input.value = '';
+    input.focus();
+  }
+
+  addBtn.addEventListener('click', addMeta);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') addMeta(); });
+
+  db.collection('metas')
+    .orderBy('createdAt', 'asc')
+    .onSnapshot(snapshot => {
+      list.innerHTML = '';
+      const docs  = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const total = docs.length;
+      const done  = docs.filter(d => d.completed).length;
+      countEl.textContent = `${done} / ${total} cumplidas`;
+      docs.forEach(renderMeta);
+    });
+
+  function renderMeta(meta) {
+    const li = document.createElement('li');
+    li.className  = 'notepad__item' + (meta.completed ? ' notepad__item--done' : '');
+    li.dataset.id = meta.id;
+
+    li.innerHTML = `
+      <input class="notepad__checkbox" type="checkbox" id="meta_${meta.id}"
+             ${meta.completed ? 'checked' : ''} aria-label="Marcar como cumplida" />
+      <label class="notepad__text" for="meta_${meta.id}">${escapeHtml(meta.text)}</label>
+      <button class="notepad__delete" aria-label="Eliminar" title="Eliminar">✕</button>
+    `;
+
+    li.querySelector('.notepad__checkbox').addEventListener('change', e => {
+      db.collection('metas').doc(meta.id).update({ completed: e.target.checked });
+    });
+
+    li.querySelector('.notepad__delete').addEventListener('click', () => {
+      if (!confirm('¿Eliminar esta meta?')) return;
+      db.collection('metas').doc(meta.id).delete();
+    });
+
+    list.appendChild(li);
+  }
+})();
+
+
+/* ─────────────────────────────────────────────────────────
+   5. READ-MORE — cartas fijas del HTML
 ───────────────────────────────────────────────────────── */
 (function initReadMore() {
   document.querySelectorAll('.letter-card:not(.letter-card--dynamic)').forEach(wireReadMore);
