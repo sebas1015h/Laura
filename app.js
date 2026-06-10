@@ -191,14 +191,18 @@
 
       if (fileInput.files.length > 0) {
         const file = fileInput.files[0];
-        const ref  = storage.ref(`photos/${Date.now()}_${file.name}`);
+        const ref  = storage.ref(`photos/${Date.now()}.jpg`);
 
-        progressWrap.hidden       = false;
-        progressBar.style.width   = '0%';
-        progressText.textContent  = 'Subiendo...';
+        progressWrap.hidden      = false;
+        progressBar.style.width  = '0%';
+        progressText.textContent = 'Comprimiendo imagen...';
+
+        const compressed = await compressImage(file);
+
+        progressText.textContent = 'Subiendo...';
 
         await new Promise((resolve, reject) => {
-          const task = ref.put(file);
+          const task = ref.put(compressed, { contentType: 'image/jpeg' });
           task.on('state_changed',
             snap => {
               const pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
@@ -515,6 +519,29 @@ function wireReadMore(card) {
 /* ─────────────────────────────────────────────────────────
    HELPERS
 ───────────────────────────────────────────────────────── */
+function compressImage(file, maxWidth = 1200, quality = 0.82) {
+  return new Promise(resolve => {
+    const reader  = new FileReader();
+    reader.onload = e => {
+      const img    = new Image();
+      img.onload   = () => {
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = Math.round(height * maxWidth / width);
+          width  = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width  = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
